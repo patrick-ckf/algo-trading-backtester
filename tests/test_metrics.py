@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-from backtester.metrics import PerformanceMetrics
+from backtester.metrics import PerformanceMetrics, calculate_buy_and_hold
 from backtester.engine import Trade
 
 
@@ -259,6 +259,64 @@ def test_all_nan_equity():
     
     # Should return empty metrics dict when no finite values
     assert metrics == {}
+
+
+def test_buy_and_hold_calculation():
+    """Test buy-and-hold benchmark calculation."""
+    data = pd.DataFrame({
+        "Close": [100, 105, 110, 108, 115],
+    }, index=pd.date_range("2020-01-01", periods=5, freq="D"))
+    
+    buy_hold = calculate_buy_and_hold(data, initial_capital=10000, commission=0.0)
+    
+    assert not buy_hold.empty
+    assert "BuyHoldEquity" in buy_hold.columns
+    assert len(buy_hold) == len(data)
+    
+    # Should buy 100 shares at $100 each
+    # Final equity should be 100 * 115 = 11500
+    assert abs(buy_hold["BuyHoldEquity"].iloc[-1] - 11500) < 1
+
+
+def test_buy_and_hold_with_commission():
+    """Test buy-and-hold with commission applied."""
+    data = pd.DataFrame({
+        "Close": [100, 110, 120],
+    }, index=pd.date_range("2020-01-01", periods=3, freq="D"))
+    
+    commission = 0.001  # 0.1%
+    buy_hold = calculate_buy_and_hold(data, initial_capital=10000, commission=commission)
+    
+    # After 0.1% commission, can buy 99 shares (9990 / 100)
+    # Final equity should be 99 * 120 = 11880
+    assert abs(buy_hold["BuyHoldEquity"].iloc[-1] - 11880) < 10
+
+
+def test_buy_and_hold_empty_data():
+    """Test buy-and-hold with empty data."""
+    data = pd.DataFrame()
+    buy_hold = calculate_buy_and_hold(data, initial_capital=10000, commission=0.0)
+    
+    assert buy_hold.empty
+
+
+def test_metrics_with_buy_hold_benchmark():
+    """Test metrics calculation includes buy-and-hold comparison."""
+    equity = create_equity_curve(10000, [0, 0.1, 0.05, -0.03, 0.08])
+    
+    data = pd.DataFrame({
+        "Close": [100, 105, 110, 108, 115],
+    }, index=equity.index)
+    
+    buy_hold = calculate_buy_and_hold(data, initial_capital=10000, commission=0.0)
+    
+    metrics_calc = PerformanceMetrics(equity, [], 10000, buy_hold_curve=buy_hold)
+    metrics = metrics_calc.calculate_all()
+    
+    assert "buy_hold_final" in metrics
+    assert "buy_hold_return_pct" in metrics
+    assert metrics["buy_hold_final"] > 0
+    assert metrics["buy_hold_return_pct"] != 0
 
 
 if __name__ == "__main__":

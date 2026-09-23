@@ -2,11 +2,45 @@
 Performance metrics calculation for backtesting results.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 import pandas as pd
 import numpy as np
 
 from backtester.engine import Trade
+
+
+def calculate_buy_and_hold(
+    data: pd.DataFrame,
+    initial_capital: float,
+    commission: float = 0.0,
+) -> pd.DataFrame:
+    """
+    Calculate buy-and-hold benchmark equity curve.
+    
+    Buys on first bar, holds until last bar, applies commission at entry.
+    
+    Args:
+        data: OHLCV DataFrame with Close prices
+        initial_capital: Starting capital
+        commission: Commission rate (default 0 for fair comparison, or match strategy commission)
+    
+    Returns:
+        DataFrame with Date index and BuyHoldEquity column
+    """
+    if data.empty or "Close" not in data.columns:
+        return pd.DataFrame()
+    
+    first_close = data["Close"].iloc[0]
+    shares = int((initial_capital * (1 - commission)) / first_close)
+    
+    if shares <= 0:
+        return pd.DataFrame()
+    
+    equity_series = shares * data["Close"]
+    
+    return pd.DataFrame({
+        "BuyHoldEquity": equity_series
+    }, index=data.index)
 
 
 class PerformanceMetrics:
@@ -18,6 +52,7 @@ class PerformanceMetrics:
         trades: List[Trade],
         initial_capital: float,
         risk_free_rate: float = 0.0,
+        buy_hold_curve: Optional[pd.DataFrame] = None,
     ):
         """
         Args:
@@ -25,11 +60,13 @@ class PerformanceMetrics:
             trades: List of completed trades
             initial_capital: Starting capital
             risk_free_rate: Annual risk-free rate for Sharpe calculation
+            buy_hold_curve: Optional buy-and-hold equity curve for comparison
         """
         self.equity_curve = equity_curve
         self.trades = trades
         self.initial_capital = initial_capital
         self.risk_free_rate = risk_free_rate
+        self.buy_hold_curve = buy_hold_curve
     
     def calculate_all(self) -> Dict[str, float]:
         """Calculate all performance metrics."""
@@ -76,6 +113,16 @@ class PerformanceMetrics:
         else:
             metrics["win_rate_pct"] = 0.0
             metrics["avg_trade_return_pct"] = 0.0
+        
+        # Buy-and-hold benchmark metrics
+        if self.buy_hold_curve is not None and not self.buy_hold_curve.empty:
+            buy_hold_equity = self.buy_hold_curve["BuyHoldEquity"]
+            buy_hold_final = buy_hold_equity.iloc[-1]
+            metrics["buy_hold_final"] = buy_hold_final
+            metrics["buy_hold_return_pct"] = ((buy_hold_final / self.initial_capital) - 1) * 100
+        else:
+            metrics["buy_hold_final"] = 0.0
+            metrics["buy_hold_return_pct"] = 0.0
         
         return metrics
     

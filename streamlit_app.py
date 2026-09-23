@@ -8,11 +8,12 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
+from typing import Optional
 import io
 
 from backtester.data import DataLoader
 from backtester.engine import BacktestEngine
-from backtester.metrics import PerformanceMetrics
+from backtester.metrics import PerformanceMetrics, calculate_buy_and_hold
 from backtester.strategies.sma_crossover import SMACrossover
 from backtester.strategies.rsi_mean_reversion import RSIMeanReversion
 
@@ -24,16 +25,26 @@ st.set_page_config(
 )
 
 
-def plot_equity_curve(equity_df: pd.DataFrame) -> go.Figure:
-    """Create equity curve chart."""
+def plot_equity_curve(equity_df: pd.DataFrame, buy_hold_df: Optional[pd.DataFrame] = None) -> go.Figure:
+    """Create equity curve chart with optional buy-and-hold benchmark."""
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=equity_df.index,
         y=equity_df["Equity"],
         mode="lines",
-        name="權益曲線",
+        name="策略權益 / Strategy Equity",
         line=dict(color="#2E86DE", width=2),
     ))
+    
+    if buy_hold_df is not None and not buy_hold_df.empty:
+        fig.add_trace(go.Scatter(
+            x=buy_hold_df.index,
+            y=buy_hold_df["BuyHoldEquity"],
+            mode="lines",
+            name="買入持有 / Buy & Hold",
+            line=dict(color="#95A5A6", width=2, dash="dash"),
+        ))
+    
     fig.update_layout(
         title="權益曲線 / Equity Curve",
         xaxis_title="日期 / Date",
@@ -86,7 +97,7 @@ def main():
         st.subheader("📊 數據來源 / Data Source")
         data_source = st.radio(
             "數據類型 / Data Type",
-            ["範例數據 / Sample CSV", "Yahoo Finance", "上傳 CSV / Upload CSV"],
+            ["Yahoo Finance", "範例數據 / Sample CSV", "上傳 CSV / Upload CSV"],
         )
         
         symbol = None
@@ -95,23 +106,28 @@ def main():
         uploaded_file = None
         data_path = None
         
-        if data_source == "範例數據 / Sample CSV":
-            data_path = "data/sample/SPY_sample.csv"
-            st.info("使用內建 SPY 範例數據 (2020-01-02 至 2020-06-01)")
-        
-        elif data_source == "Yahoo Finance":
+        if data_source == "Yahoo Finance":
             symbol = st.text_input("股票代號 / Symbol", value="SPY")
             col1, col2 = st.columns(2)
             with col1:
                 start_date = st.date_input(
                     "開始日期 / Start",
-                    value=datetime.now() - timedelta(days=365*2)
+                    value=datetime(2018, 1, 1)
                 )
             with col2:
                 end_date = st.date_input(
                     "結束日期 / End",
                     value=datetime.now()
                 )
+        
+        elif data_source == "範例數據 / Sample CSV":
+            data_path = "data/sample/SPY_sample.csv"
+            st.warning(
+                "⚠️ 範例數據僅涵蓋 2020-01-02 至 2020-06-01（約 104 個交易日，COVID-19 熊市期間）。"
+                "此期間不足以充分測試 SMA 50/200 策略（需要 200+ 個交易日）。"
+                "\n\n⚠️ Sample data covers only 2020-01-02 to 2020-06-01 (~104 bars, COVID-19 bear market). "
+                "Insufficient for SMA 50/200 strategy (needs 200+ bars)."
+            )
         
         else:  # Upload CSV
             uploaded_file = st.file_uploader(
@@ -247,10 +263,18 @@ def main():
                 
                 equity_curve = engine.run(strategy, data)
                 
+                # Calculate buy-and-hold benchmark
+                buy_hold_curve = calculate_buy_and_hold(
+                    data=data,
+                    initial_capital=initial_capital,
+                    commission=commission,
+                )
+                
                 metrics_calculator = PerformanceMetrics(
                     equity_curve=equity_curve,
                     trades=engine.trades,
                     initial_capital=initial_capital,
+                    buy_hold_curve=buy_hold_curve,
                 )
                 metrics = metrics_calculator.calculate_all()
             
@@ -310,6 +334,32 @@ def main():
                     format_metric(metrics.get('win_rate_pct', float('nan')), fmt=".1f", suffix="%"),
                 )
             
+            # Buy-and-hold benchmark comparison
+            st.markdown("### 📉 買入持有基準 / Buy & Hold Benchmark")
+            col9, col10 = st.columns(2)
+            with col9:
+                st.metric(
+                    "買入持有最終權益 / Buy & Hold Final",
+                    f"${metrics['buy_hold_final']:,.0f}",
+                )
+            with col10:
+                st.metric(
+                    "買入持有回報 / Buy & Hold Return",
+                    f"{metrics['buy_hold_return_pct']:.2f}%",
+                )
+            
+            # Educational note in Traditional Chinese
+            st.info(
+                "💡 **教育性說明 / Educational Note**\n\n"
+                "策略回報為正不代表策略有效——需要比較「買入持有」基準。"
+                "這些策略僅供教育和研究使用，不構成投資建議。"
+                "過去績效不代表未來表現。"
+                "\n\n"
+                "A positive strategy return does not mean the strategy is effective—you must compare against "
+                "the buy-and-hold benchmark. These strategies are for educational and research purposes only "
+                "and do not constitute investment advice. Past performance does not guarantee future results."
+            )
+            
             st.markdown("---")
             
             st.markdown("## 📈 圖表 / Charts")
@@ -317,7 +367,7 @@ def main():
             tab1, tab2 = st.tabs(["權益曲線 / Equity Curve", "回撤圖 / Drawdown"])
             
             with tab1:
-                st.plotly_chart(plot_equity_curve(equity_curve), use_container_width=True)
+                st.plotly_chart(plot_equity_curve(equity_curve, buy_hold_curve), use_container_width=True)
             
             with tab2:
                 st.plotly_chart(plot_drawdown(equity_curve), use_container_width=True)
@@ -358,13 +408,13 @@ def main():
         st.markdown("## 快速開始 / Quick Start")
         st.markdown("""
         **預設設定已可運行：**
-        1. 使用內建範例數據（SPY 2020 年數據）
-        2. 選擇策略（SMA 或 RSI）
+        1. 數據來源：Yahoo Finance（SPY，2018-01-01 至今）
+        2. 策略：SMA 交叉（快線 20 / 慢線 50）
         3. 點擊「運行回測」按鈕
         
         **Default settings are ready to run:**
-        1. Uses built-in sample data (SPY 2020)
-        2. Select a strategy (SMA or RSI)
+        1. Data source: Yahoo Finance (SPY, 2018-01-01 to today)
+        2. Strategy: SMA Crossover (fast 20 / slow 50)
         3. Click 'Run Backtest' button
         
         ---
@@ -372,6 +422,7 @@ def main():
         **功能 / Features:**
         - 📊 即時圖表顯示權益曲線和回撤
         - 📈 完整績效指標（回報率、CAGR、夏普比率等）
+        - 📉 買入持有基準比較
         - 💰 可自訂佣金、滑點和倉位大小
         - 🔄 支援 Yahoo Finance 線上數據或上傳自己的 CSV
         - 📥 下載交易明細
