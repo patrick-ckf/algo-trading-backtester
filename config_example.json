@@ -1,0 +1,51 @@
+{
+  "backtest_configs": {
+    "sma_spy_default": {
+      "strategy": "sma",
+      "symbol": "SPY",
+      "start_date": "2020-01-01",
+      "end_date": "2023-12-31",
+      "initial_capital": 100000,
+      "commission": 0.001,
+      "slippage": 0.0005,
+      "position_size": 0.95,
+      "strategy_params": {
+        "fast_period": 50,
+        "slow_period": 200
+      }
+    },
+    "rsi_aapl_aggressive": {
+      "strategy": "rsi",
+      "symbol": "AAPL",
+      "start_date": "2021-01-01",
+      "initial_capital": 50000,
+      "commission": 0.001,
+      "slippage": 0.0005,
+      "position_size": 0.90,
+      "strategy_params": {
+        "rsi_period": 14,
+        "rsi_oversold": 30,
+        "rsi_overbought": 70
+      }
+    },
+    "sma_btc_crypto": {
+      "strategy": "sma",
+      "symbol": "BTC-USD",
+      "start_date": "2022-01-01",
+      "initial_capital": 100000,
+      "commission": 0.002,
+      "slippage": 0.001,
+      "position_size": 0.80,
+      "strategy_params": {
+        "fast_period": 20,
+        "slow_period": 50
+      }
+    }
+  },
+  "notes": {
+    "commission": "Set higher for crypto (e.g., 0.002 = 0.2%)",
+    "slippage": "Crypto markets may need higher slippage (e.g., 0.001)",
+    "position_size": "Fraction of equity to use per trade (0.0 to 1.0)",
+    "symbols": "Use Yahoo Finance ticker format (e.g., BTC-USD for Bitcoin)"
+  }
+}
