@@ -253,6 +253,7 @@ streamlit run streamlit_app.py
 - 🎯 **互動式控制面板**：選擇策略、設定參數、選擇數據源
 - 📊 **即時圖表**：權益曲線、回撤圖
 - 📈 **績效指標**：總回報、CAGR、夏普比率、勝率等
+- 📉 **買入持有基準**：與被動投資策略比較
 - 📋 **交易明細**：完整的交易記錄表格
 - 📥 **下載功能**：匯出交易記錄為 CSV
 - 🔄 **多種數據源**：內建範例、Yahoo Finance、上傳 CSV
@@ -260,10 +261,13 @@ streamlit run streamlit_app.py
 ### 快速開始（儀表板）
 
 1. 啟動應用程式：`streamlit run streamlit_app.py`
-2. 預設已載入範例數據（SPY），無需配置
-3. 選擇策略（SMA 或 RSI）
-4. 點擊「運行回測」按鈕
-5. 查看圖表和指標
+2. 預設已設定為最佳實踐：
+   - 數據來源：Yahoo Finance（SPY，2018-01-01 至今）
+   - 策略：SMA 交叉（快線 20 / 慢線 50）
+3. 點擊「運行回測」按鈕
+4. 查看圖表和指標，包括買入持有基準比較
+
+**注意**：內建範例 CSV 僅涵蓋 2020 年初 COVID-19 熊市期間（~104 個交易日），不建議用於測試長期策略（如 SMA 50/200）。
 
 ## 雲端部署 / Cloud Deployment
 
@@ -400,6 +404,7 @@ Open your browser to http://localhost:8501 and start backtesting with the intera
 - 📊 Real-time charts (equity curve, drawdown)
 - 🎯 Visual controls for all parameters
 - 📈 Complete performance metrics
+- 📉 Buy-and-hold benchmark comparison
 - 📋 Trade history table
 - 📥 Download results as CSV
 - 🔄 Multiple data sources (sample CSV, Yahoo Finance, file upload)
