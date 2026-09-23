@@ -4,6 +4,7 @@ Streamlit Dashboard for Backtesting System
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
@@ -161,14 +162,14 @@ def main():
                 "快線週期 / Fast Period",
                 min_value=5,
                 max_value=200,
-                value=50,
+                value=20,
                 step=5,
             )
             slow_period = st.number_input(
                 "慢線週期 / Slow Period",
                 min_value=10,
                 max_value=300,
-                value=200,
+                value=50,
                 step=10,
             )
         else:  # RSI
@@ -257,48 +258,56 @@ def main():
             
             st.markdown("## 📊 績效指標 / Performance Metrics")
             
+            def format_metric(value, fmt=".2f", suffix=""):
+                """Format metric safely, handling NaN/inf values."""
+                if pd.isna(value) or not np.isfinite(value):
+                    return "N/A"
+                return f"{value:{fmt}}{suffix}"
+            
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric(
                     "總回報 / Total Return",
-                    f"{metrics['total_return_pct']:.2f}%",
+                    format_metric(metrics.get('total_return_pct', float('nan')), suffix="%"),
                 )
             with col2:
                 st.metric(
                     "年化報酬 / CAGR",
-                    f"{metrics['cagr_pct']:.2f}%",
+                    format_metric(metrics.get('cagr_pct', float('nan')), suffix="%"),
                 )
             with col3:
                 st.metric(
                     "最大回撤 / Max Drawdown",
-                    f"{metrics['max_drawdown_pct']:.2f}%",
+                    format_metric(metrics.get('max_drawdown_pct', float('nan')), suffix="%"),
                 )
             with col4:
                 st.metric(
                     "夏普比率 / Sharpe",
-                    f"{metrics['sharpe_ratio']:.2f}",
+                    format_metric(metrics.get('sharpe_ratio', float('nan'))),
                 )
             
             col5, col6, col7, col8 = st.columns(4)
             with col5:
                 st.metric(
                     "初始資金 / Initial",
-                    f"${metrics['initial_capital']:,.0f}",
+                    f"${metrics.get('initial_capital', 0):,.0f}",
                 )
             with col6:
+                final_eq = metrics.get('final_equity', float('nan'))
+                final_eq_str = "N/A" if pd.isna(final_eq) or not np.isfinite(final_eq) else f"${final_eq:,.0f}"
                 st.metric(
                     "最終權益 / Final",
-                    f"${metrics['final_equity']:,.0f}",
+                    final_eq_str,
                 )
             with col7:
                 st.metric(
                     "交易次數 / Trades",
-                    f"{metrics['trade_count']}",
+                    f"{metrics.get('trade_count', 0)}",
                 )
             with col8:
                 st.metric(
                     "勝率 / Win Rate",
-                    f"{metrics['win_rate_pct']:.1f}%",
+                    format_metric(metrics.get('win_rate_pct', float('nan')), fmt=".1f", suffix="%"),
                 )
             
             st.markdown("---")

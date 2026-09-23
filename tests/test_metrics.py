@@ -220,5 +220,46 @@ def test_avg_trade_return():
     assert abs(metrics["avg_trade_return_pct"] - 7.5) < 0.01
 
 
+def test_trailing_nan_equity_handling():
+    """
+    Regression test: equity curve with trailing NaN should not produce nan metrics.
+    This simulates the Yahoo Finance bug where Close=NaN on recent dates.
+    """
+    # Create equity curve with trailing NaN (like the bug scenario)
+    equity_values = [10000, 10500, 11000, 11200, np.nan]
+    dates = pd.date_range("2020-01-01", periods=5, freq="D")
+    equity = pd.DataFrame({"Equity": equity_values}, index=dates)
+    
+    metrics_calc = PerformanceMetrics(equity, [], 10000)
+    metrics = metrics_calc.calculate_all()
+    
+    # Should use last finite value (11200) not NaN
+    assert "final_equity" in metrics
+    assert not np.isnan(metrics["final_equity"])
+    assert metrics["final_equity"] == 11200
+    
+    # Total return should be computed from finite value
+    assert not np.isnan(metrics["total_return_pct"])
+    expected_return = ((11200 / 10000) - 1) * 100
+    assert abs(metrics["total_return_pct"] - expected_return) < 0.01
+    
+    # CAGR should also be finite
+    assert not np.isnan(metrics["cagr_pct"])
+    assert np.isfinite(metrics["cagr_pct"])
+
+
+def test_all_nan_equity():
+    """Test metrics when all equity values are NaN."""
+    equity = pd.DataFrame({
+        "Equity": [np.nan, np.nan, np.nan]
+    }, index=pd.date_range("2020-01-01", periods=3, freq="D"))
+    
+    metrics_calc = PerformanceMetrics(equity, [], 10000)
+    metrics = metrics_calc.calculate_all()
+    
+    # Should return empty metrics dict when no finite values
+    assert metrics == {}
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

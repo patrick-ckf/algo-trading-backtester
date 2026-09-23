@@ -39,13 +39,19 @@ class PerformanceMetrics:
             return metrics
         
         equity = self.equity_curve["Equity"]
-        final_equity = equity.iloc[-1]
+        
+        # Use last finite equity value to avoid NaN propagation
+        finite_equity = equity[equity.notna()]
+        if finite_equity.empty:
+            return metrics
+        
+        final_equity = finite_equity.iloc[-1]
         
         metrics["initial_capital"] = self.initial_capital
         metrics["final_equity"] = final_equity
         metrics["total_return_pct"] = ((final_equity / self.initial_capital) - 1) * 100
         
-        years = len(equity) / 252.0
+        years = len(finite_equity) / 252.0
         if years > 0:
             metrics["cagr_pct"] = (((final_equity / self.initial_capital) ** (1 / years)) - 1) * 100
         else:

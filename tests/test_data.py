@@ -4,6 +4,7 @@ Unit tests for data loading and management.
 
 import pytest
 import pandas as pd
+import numpy as np
 import tempfile
 import os
 from pathlib import Path
@@ -183,6 +184,86 @@ def test_load_csv_empty_file():
         assert len(data) == 0
     finally:
         os.unlink(temp_file)
+
+
+def test_load_csv_with_nan_close_dropped():
+    """
+    Regression test: CSV with NaN Close values should be cleaned.
+    This simulates Yahoo Finance returning NaN Close on recent dates.
+    """
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        f.write("Date,Open,High,Low,Close,Volume\n")
+        f.write("2020-01-01,100.0,101.0,99.0,100.5,1000000\n")
+        f.write("2020-01-02,100.5,102.0,100.0,101.5,1100000\n")
+        f.write("2020-01-03,101.5,103.0,101.0,nan,1200000\n")  # NaN Close
+        temp_file = f.name
+    
+    try:
+        loader = DataLoader()
+        data = loader.load_csv(temp_file)
+        
+        # Should drop the row with NaN Close
+        assert len(data) == 2
+        assert data.iloc[0]["Close"] == 100.5
+        assert data.iloc[1]["Close"] == 101.5
+        # Should not contain any NaN Close values
+        assert not data["Close"].isna().any()
+        
+    finally:
+        os.unlink(temp_file)
+
+
+def test_load_csv_with_multiple_nan_columns():
+    """Test cleaning when multiple OHLCV columns have NaN."""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        f.write("Date,Open,High,Low,Close,Volume\n")
+        f.write("2020-01-01,100.0,101.0,99.0,100.5,1000000\n")
+        f.write("2020-01-02,nan,102.0,100.0,101.5,1100000\n")  # NaN Open
+        f.write("2020-01-03,101.5,103.0,101.0,102.0,nan\n")   # NaN Volume
+        f.write("2020-01-04,102.0,103.5,101.5,102.5,1300000\n")
+        temp_file = f.name
+    
+    try:
+        loader = DataLoader()
+        data = loader.load_csv(temp_file)
+        
+        # Should drop rows with any NaN in OHLCV
+        assert len(data) == 2
+        assert data.iloc[0]["Close"] == 100.5
+        assert data.iloc[1]["Close"] == 102.5
+        
+        # Verify no NaN in any OHLCV column
+        assert not data["Open"].isna().any()
+        assert not data["High"].isna().any()
+        assert not data["Low"].isna().any()
+        assert not data["Close"].isna().any()
+        assert not data["Volume"].isna().any()
+        
+    finally:
+        os.unlink(temp_file)
+
+
+def test_clean_ohlcv_trailing_nan():
+    """Test the _clean_ohlcv method directly with trailing NaN."""
+    loader = DataLoader()
+    
+    # Create DataFrame with trailing NaN (simulates Yahoo Finance bug)
+    dates = pd.date_range("2020-01-01", periods=5, freq="D")
+    df = pd.DataFrame({
+        "Open": [100.0, 101.0, 102.0, 103.0, np.nan],
+        "High": [101.0, 102.0, 103.0, 104.0, np.nan],
+        "Low": [99.0, 100.0, 101.0, 102.0, np.nan],
+        "Close": [100.5, 101.5, 102.5, 103.5, np.nan],
+        "Volume": [1000000, 1100000, 1200000, 1300000, np.nan],
+    }, index=dates)
+    df.index.name = "Date"
+    
+    cleaned = loader._clean_ohlcv(df)
+    
+    # Should drop the last row with NaN
+    assert len(cleaned) == 4
+    assert cleaned.iloc[-1]["Close"] == 103.5
+    assert not cleaned["Close"].isna().any()
 
 
 if __name__ == "__main__":

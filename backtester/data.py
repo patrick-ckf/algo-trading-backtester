@@ -25,6 +25,7 @@ class DataLoader:
         df = pd.read_csv(filepath, parse_dates=["Date"], index_col="Date")
         df = df.sort_index()
         self._validate_ohlcv(df)
+        df = self._clean_ohlcv(df)
         return df
     
     def fetch_yahoo(
@@ -60,6 +61,8 @@ class DataLoader:
         df.index.name = "Date"
         df = df[["Open", "High", "Low", "Close", "Volume"]]
         
+        df = self._clean_ohlcv(df)
+        
         df.to_csv(cache_file)
         print(f"Data cached to {cache_file}")
         
@@ -71,3 +74,20 @@ class DataLoader:
         missing = [col for col in required_cols if col not in df.columns]
         if missing:
             raise ValueError(f"Missing required columns: {missing}")
+    
+    def _clean_ohlcv(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Clean OHLCV data by removing rows with NaN values.
+        
+        Yahoo Finance can return NaN Close prices on recent dates,
+        which propagates through the backtest engine as NaN equity.
+        This method drops any rows with NaN in OHLCV columns.
+        """
+        initial_len = len(df)
+        df = df.dropna(subset=["Open", "High", "Low", "Close", "Volume"])
+        final_len = len(df)
+        
+        if final_len < initial_len:
+            print(f"Dropped {initial_len - final_len} rows with NaN values")
+        
+        return df
