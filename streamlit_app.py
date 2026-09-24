@@ -1024,49 +1024,49 @@ def main():
                     excluded_dates,
                     entry_column="Entry Date",
                 )
-                    
-                    # Calculate filtered metrics
-                    filtered_metrics = calculate_research_metrics(
-                        filtered_trades_df,
-                        initial_capital,
-                        equity_curve,
+                
+                # Calculate filtered metrics
+                filtered_metrics = calculate_research_metrics(
+                    filtered_trades_df,
+                    initial_capital,
+                    equity_curve,
+                )
+                
+                st.markdown("**對比摘要 / Comparison Summary**")
+                col_left, col_right = st.columns(2)
+                
+                with col_left:
+                    st.markdown("**完整回測 / Full Backtest**")
+                    st.metric("交易次數 / Trades", metrics.get('trade_count', 0))
+                    st.metric("總回報 / Return", f"{metrics.get('total_return_pct', 0):.2f}%")
+                    st.metric("勝率 / Win Rate", f"{metrics.get('win_rate_pct', 0):.1f}%")
+                
+                with col_right:
+                    st.markdown(f"**過濾後（避開 ±{calendar_filter_days_before}/{calendar_filter_days_after} 日）/ Filtered**")
+                    excluded_count = metrics.get('trade_count', 0) - filtered_metrics['trade_count']
+                    st.metric(
+                        "交易次數 / Trades",
+                        filtered_metrics['trade_count'],
+                        delta=f"-{excluded_count}",
+                        delta_color="off"
                     )
-                    
-                    st.markdown("**對比摘要 / Comparison Summary**")
-                    col_left, col_right = st.columns(2)
-                    
-                    with col_left:
-                        st.markdown("**完整回測 / Full Backtest**")
-                        st.metric("交易次數 / Trades", metrics.get('trade_count', 0))
-                        st.metric("總回報 / Return", f"{metrics.get('total_return_pct', 0):.2f}%")
-                        st.metric("勝率 / Win Rate", f"{metrics.get('win_rate_pct', 0):.1f}%")
-                    
-                    with col_right:
-                        st.markdown(f"**過濾後（避開 ±{calendar_filter_days_before}/{calendar_filter_days_after} 日）/ Filtered**")
-                        excluded_count = metrics.get('trade_count', 0) - filtered_metrics['trade_count']
-                        st.metric(
-                            "交易次數 / Trades",
-                            filtered_metrics['trade_count'],
-                            delta=f"-{excluded_count}",
-                            delta_color="off"
-                        )
-                        return_delta = filtered_metrics['total_return_pct'] - metrics.get('total_return_pct', 0)
-                        st.metric(
-                            "總回報 / Return",
-                            f"{filtered_metrics['total_return_pct']:.2f}%",
-                            delta=f"{return_delta:+.2f}%",
-                        )
-                        win_rate_delta = filtered_metrics['win_rate_pct'] - metrics.get('win_rate_pct', 0)
-                        st.metric(
-                            "勝率 / Win Rate",
-                            f"{filtered_metrics['win_rate_pct']:.1f}%",
-                            delta=f"{win_rate_delta:+.1f}%",
-                        )
-                    
-                    st.caption(
-                        "對比完整回測與過濾後結果，可研究經濟數據發布對策略績效的影響。\n\n"
-                        "Compare full vs. filtered results to research the impact of economic releases."
+                    return_delta = filtered_metrics['total_return_pct'] - metrics.get('total_return_pct', 0)
+                    st.metric(
+                        "總回報 / Return",
+                        f"{filtered_metrics['total_return_pct']:.2f}%",
+                        delta=f"{return_delta:+.2f}%",
                     )
+                    win_rate_delta = filtered_metrics['win_rate_pct'] - metrics.get('win_rate_pct', 0)
+                    st.metric(
+                        "勝率 / Win Rate",
+                        f"{filtered_metrics['win_rate_pct']:.1f}%",
+                        delta=f"{win_rate_delta:+.1f}%",
+                    )
+                
+                st.caption(
+                    "對比完整回測與過濾後結果，可研究經濟數據發布對策略績效的影響。\n\n"
+                    "Compare full vs. filtered results to research the impact of economic releases."
+                )
             
             # Earnings research filter comparison (opt-in only)
             if show_earnings and earnings_loaded and earnings_filter_enabled and earnings_events is not None:
@@ -1098,50 +1098,50 @@ def main():
                     excluded_earnings_dates,
                     entry_column="Entry Date",
                 )
-                    
-                    # Calculate filtered metrics
-                    from backtester.earnings_calendar import calculate_research_metrics as calc_earnings_metrics
-                    filtered_earnings_metrics = calc_earnings_metrics(
-                        filtered_earnings_trades_df,
-                        initial_capital,
-                        equity_curve,
+                
+                # Calculate filtered metrics
+                from backtester.earnings_calendar import calculate_research_metrics as calc_earnings_metrics
+                filtered_earnings_metrics = calc_earnings_metrics(
+                    filtered_earnings_trades_df,
+                    initial_capital,
+                    equity_curve,
+                )
+                
+                st.markdown("**對比摘要 / Comparison Summary**")
+                col_left, col_right = st.columns(2)
+                
+                with col_left:
+                    st.markdown("**完整回測 / Full Backtest**")
+                    st.metric("交易次數 / Trades", metrics.get('trade_count', 0))
+                    st.metric("總回報 / Return", f"{metrics.get('total_return_pct', 0):.2f}%")
+                    st.metric("勝率 / Win Rate", f"{metrics.get('win_rate_pct', 0):.1f}%")
+                
+                with col_right:
+                    st.markdown(f"**過濾後（避開財報 ±{earnings_filter_days_before}/{earnings_filter_days_after} 日）/ Filtered**")
+                    excluded_count = metrics.get('trade_count', 0) - filtered_earnings_metrics['trade_count']
+                    st.metric(
+                        "交易次數 / Trades",
+                        filtered_earnings_metrics['trade_count'],
+                        delta=f"-{excluded_count}",
+                        delta_color="off"
                     )
-                    
-                    st.markdown("**對比摘要 / Comparison Summary**")
-                    col_left, col_right = st.columns(2)
-                    
-                    with col_left:
-                        st.markdown("**完整回測 / Full Backtest**")
-                        st.metric("交易次數 / Trades", metrics.get('trade_count', 0))
-                        st.metric("總回報 / Return", f"{metrics.get('total_return_pct', 0):.2f}%")
-                        st.metric("勝率 / Win Rate", f"{metrics.get('win_rate_pct', 0):.1f}%")
-                    
-                    with col_right:
-                        st.markdown(f"**過濾後（避開財報 ±{earnings_filter_days_before}/{earnings_filter_days_after} 日）/ Filtered**")
-                        excluded_count = metrics.get('trade_count', 0) - filtered_earnings_metrics['trade_count']
-                        st.metric(
-                            "交易次數 / Trades",
-                            filtered_earnings_metrics['trade_count'],
-                            delta=f"-{excluded_count}",
-                            delta_color="off"
-                        )
-                        return_delta = filtered_earnings_metrics['total_return_pct'] - metrics.get('total_return_pct', 0)
-                        st.metric(
-                            "總回報 / Return",
-                            f"{filtered_earnings_metrics['total_return_pct']:.2f}%",
-                            delta=f"{return_delta:+.2f}%",
-                        )
-                        win_rate_delta = filtered_earnings_metrics['win_rate_pct'] - metrics.get('win_rate_pct', 0)
-                        st.metric(
-                            "勝率 / Win Rate",
-                            f"{filtered_earnings_metrics['win_rate_pct']:.1f}%",
-                            delta=f"{win_rate_delta:+.1f}%",
-                        )
-                    
-                    st.caption(
-                        "對比完整回測與過濾後結果，可研究財報發布對策略績效的影響。\n\n"
-                        "Compare full vs. filtered results to research the impact of earnings releases."
+                    return_delta = filtered_earnings_metrics['total_return_pct'] - metrics.get('total_return_pct', 0)
+                    st.metric(
+                        "總回報 / Return",
+                        f"{filtered_earnings_metrics['total_return_pct']:.2f}%",
+                        delta=f"{return_delta:+.2f}%",
                     )
+                    win_rate_delta = filtered_earnings_metrics['win_rate_pct'] - metrics.get('win_rate_pct', 0)
+                    st.metric(
+                        "勝率 / Win Rate",
+                        f"{filtered_earnings_metrics['win_rate_pct']:.1f}%",
+                        delta=f"{win_rate_delta:+.1f}%",
+                    )
+                
+                st.caption(
+                    "對比完整回測與過濾後結果，可研究財報發布對策略績效的影響。\n\n"
+                    "Compare full vs. filtered results to research the impact of earnings releases."
+                )
             
             # Trade details
             st.markdown("### 交易明細 / Trade Details")
