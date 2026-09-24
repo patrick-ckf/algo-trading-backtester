@@ -8,12 +8,14 @@ Tests verify:
 4. Trade filtering (research filter)
 5. Graceful degradation when calendar unavailable
 6. Phase 0 compliance: L0 backtest unchanged when calendar off/display-only
+7. Timezone normalization: tz-aware calendar vs tz-naive yfinance data
 """
 
 import pytest
 import pandas as pd
 import numpy as np
 import os
+import tempfile
 from datetime import datetime
 
 from backtester.economic_calendar import (
@@ -416,6 +418,130 @@ class TestStreamlitIntegration:
         
         # Should not raise error when None
         assert event_markers is None or isinstance(event_markers, pd.DataFrame)
+
+
+class TestTimezoneNormalization:
+    """Test timezone-aware calendar dates work with tz-naive yfinance data."""
+    
+    def test_timezone_aware_csv_normalized_on_load(self):
+        """Test that tz-aware dates in CSV are normalized to naive on load."""
+        # Create temporary CSV with tz-aware dates (simulating real-world bug)
+        csv_content = """Date,Event,Type,Country
+2018-01-03 00:00:00-05:00,FOMC Minutes,FOMC,US
+2018-06-13 00:00:00-04:00,FOMC Decision,FOMC,US
+2018-12-19 00:00:00-05:00,FOMC Decision,FOMC,US
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+        
+        try:
+            calendar = EconomicCalendar(calendar_path=temp_path)
+            success = calendar.load()
+            
+            assert success, "Should load tz-aware CSV"
+            assert calendar.is_loaded()
+            
+            # After load, dates should be timezone-naive
+            assert calendar.calendar_df["Date"].dt.tz is None, \
+                "Calendar dates should be normalized to tz-naive"
+            
+            # Dates should be at midnight
+            first_date = calendar.calendar_df.iloc[0]["Date"]
+            assert first_date.hour == 0
+            assert first_date.minute == 0
+        finally:
+            os.unlink(temp_path)
+    
+    def test_filter_with_yfinance_naive_dates(self):
+        """
+        Test filtering with tz-naive dates from yfinance (main bug reproduction).
+        
+        This reproduces the original TypeError:
+        "Invalid comparison between dtype=datetime64[us] and str"
+        """
+        # Create temporary CSV with tz-aware dates
+        csv_content = """Date,Event,Type,Country
+2018-01-03 00:00:00-05:00,FOMC Minutes,FOMC,US
+2018-02-02 00:00:00-05:00,NFP Employment Report,NFP,US
+2018-06-13 00:00:00-04:00,FOMC Decision,FOMC,US
+2018-12-19 00:00:00-05:00,FOMC Decision,FOMC,US
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+        
+        try:
+            calendar = EconomicCalendar(calendar_path=temp_path)
+            calendar.load()
+            
+            # Simulate yfinance data.index: tz-naive datetime64[us]
+            yfinance_index = pd.date_range(start="2018-01-01", end="2018-12-31", freq="B")
+            yfinance_index = yfinance_index.tz_localize(None)  # Ensure naive
+            
+            # This is what would fail before fix: comparing tz-aware with tz-naive
+            start_date = yfinance_index.min()  # tz-naive Timestamp
+            end_date = yfinance_index.max()    # tz-naive Timestamp
+            
+            # Should NOT raise TypeError after fix
+            filtered = calendar.filter_by_date_range(start_date, end_date)
+            
+            assert len(filtered) == 4, "Should find all 4 events"
+            assert filtered["Date"].dt.tz is None, "Filtered dates should be tz-naive"
+        finally:
+            os.unlink(temp_path)
+    
+    def test_filter_handles_datetime64_us_dtype(self):
+        """Test compatibility with datetime64[us] dtype from yfinance."""
+        # Create temporary CSV
+        csv_content = """Date,Event,Type,Country
+2018-01-03,FOMC Minutes,FOMC,US
+2018-12-19,FOMC Decision,FOMC,US
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+        
+        try:
+            calendar = EconomicCalendar(calendar_path=temp_path)
+            calendar.load()
+            
+            # Create datetime64[us] timestamps (as yfinance might return)
+            dates = pd.date_range(start="2018-01-01", end="2018-12-31", freq="B")
+            us_dtype_index = dates.astype("datetime64[us]")
+            
+            start = us_dtype_index.min()
+            end = us_dtype_index.max()
+            
+            # Should work without error
+            filtered = calendar.filter_by_date_range(start, end)
+            assert len(filtered) == 2
+        finally:
+            os.unlink(temp_path)
+    
+    def test_mixed_timezone_dst_transitions(self):
+        """Test handling of DST transitions in US/Eastern timezone."""
+        # CSV with dates spanning DST transition (March: -05:00 -> -04:00)
+        csv_content = """Date,Event,Type,Country
+2018-03-11 00:00:00-04:00,After DST Start,CPI,US
+2018-11-04 00:00:00-05:00,After DST End,CPI,US
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+        
+        try:
+            calendar = EconomicCalendar(calendar_path=temp_path)
+            success = calendar.load()
+            
+            assert success, "Should handle mixed timezone offsets from DST"
+            
+            # Dates should be normalized correctly
+            dates = calendar.calendar_df["Date"].tolist()
+            assert pd.Timestamp("2018-03-11").date() == dates[0].date()
+            assert pd.Timestamp("2018-11-04").date() == dates[1].date()
+        finally:
+            os.unlink(temp_path)
 
 
 if __name__ == "__main__":

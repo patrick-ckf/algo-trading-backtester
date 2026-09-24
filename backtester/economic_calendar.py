@@ -47,13 +47,25 @@ class EconomicCalendar:
             if not os.path.exists(self.calendar_path):
                 return False
             
-            self.calendar_df = pd.read_csv(
-                self.calendar_path,
-                parse_dates=["Date"],
-            )
+            # Read CSV without parsing dates first (to handle tz-aware strings)
+            df_raw = pd.read_csv(self.calendar_path)
             
-            if self.calendar_df.empty:
+            if df_raw.empty:
                 return False
+            
+            # Parse dates with utc=True to handle mixed timezones (DST transitions)
+            # This converts all timestamps to UTC, avoiding "Mixed timezones detected" error
+            df_raw["Date"] = pd.to_datetime(df_raw["Date"], utc=True)
+            
+            # Normalize dates to timezone-naive for compatibility with yfinance
+            # yfinance returns tz-naive datetime64[us] DatetimeIndex
+            # Convert UTC to naive for consistent comparison
+            df_raw["Date"] = df_raw["Date"].dt.tz_localize(None)
+            
+            # Normalize to midnight for clean date comparison
+            df_raw["Date"] = pd.to_datetime(df_raw["Date"].dt.date)
+            
+            self.calendar_df = df_raw
             
             # Extract available event types
             if "Type" in self.calendar_df.columns:
@@ -85,8 +97,8 @@ class EconomicCalendar:
         Filter calendar events by date range and optional event types.
         
         Args:
-            start_date: Start of date range
-            end_date: End of date range
+            start_date: Start of date range (tz-naive or aware)
+            end_date: End of date range (tz-naive or aware)
             event_types: List of event types to include. If None, includes all.
         
         Returns:
@@ -95,8 +107,22 @@ class EconomicCalendar:
         if not self.is_loaded():
             return pd.DataFrame(columns=["Date", "Event", "Type", "Country"])
         
+        # Normalize input dates to tz-naive for comparison
+        # (calendar dates are already normalized to tz-naive in load())
+        start_naive = pd.to_datetime(start_date)
+        end_naive = pd.to_datetime(end_date)
+        
+        if start_naive.tz is not None:
+            start_naive = start_naive.tz_convert("UTC").tz_localize(None)
+        if end_naive.tz is not None:
+            end_naive = end_naive.tz_convert("UTC").tz_localize(None)
+        
+        # Normalize to date-only for comparison
+        start_naive = pd.to_datetime(start_naive.date())
+        end_naive = pd.to_datetime(end_naive.date())
+        
         # Filter by date range
-        mask = (self.calendar_df["Date"] >= start_date) & (self.calendar_df["Date"] <= end_date)
+        mask = (self.calendar_df["Date"] >= start_naive) & (self.calendar_df["Date"] <= end_naive)
         filtered = self.calendar_df[mask].copy()
         
         # Filter by event types if specified
