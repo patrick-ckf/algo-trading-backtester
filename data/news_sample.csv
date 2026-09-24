@@ -1,0 +1,118 @@
+Date,Headline,Symbol,Sentiment
+2018-02-05,Market Plunges as Volatility Surges to Two-Year High,SPY,Negative
+2018-02-06,S&P 500 Suffers Worst Day Since 2011,SPY,Negative
+2018-03-22,Trade War Fears Send Stocks Tumbling,SPY,Negative
+2018-03-23,Tech Stocks Lead Market Lower on Data Privacy Concerns,QQQ,Negative
+2018-10-10,S&P 500 Falls Into Correction Territory,SPY,Negative
+2018-10-24,Tech Giants Lose $1 Trillion in Value,QQQ,Negative
+2018-12-24,Worst December for Stocks Since Great Depression,SPY,Negative
+2018-12-26,S&P 500 Rallies 5% in Best Day Since 2009,SPY,Positive
+2019-01-04,Strong Jobs Report Boosts Market Sentiment,SPY,Positive
+2019-03-22,Fed Signals No Rate Hikes This Year,SPY,Positive
+2019-04-23,S&P 500 Hits New All-Time High,SPY,Positive
+2019-06-04,Recession Fears Grow as Bond Yields Invert,SPY,Negative
+2019-07-31,Fed Cuts Interest Rates for First Time Since 2008,SPY,Positive
+2019-08-05,Market Tumbles as Trade War Escalates,SPY,Negative
+2019-08-23,Powell Signals More Rate Cuts Possible,SPY,Positive
+2019-10-11,Trade Deal Hopes Lift Market to Record High,SPY,Positive
+2019-12-12,Phase One Trade Deal Announced,SPY,Positive
+2020-01-08,Tech Stocks Rally on Strong Earnings Outlook,QQQ,Positive
+2020-01-21,First US Coronavirus Case Confirmed,SPY,Neutral
+2020-02-19,S&P 500 Reaches Record High Before Virus Concerns Mount,SPY,Positive
+2020-02-24,Coronavirus Fears Trigger Sharp Selloff,SPY,Negative
+2020-02-27,Dow Suffers Biggest Weekly Drop Since 2008,SPY,Negative
+2020-03-09,Oil Price War Triggers Market Crash,SPY,Negative
+2020-03-11,WHO Declares Coronavirus Pandemic,SPY,Negative
+2020-03-12,S&P 500 Plunges 10% in Worst Day Since 1987,SPY,Negative
+2020-03-16,Dow Plunges Nearly 3000 Points as Virus Shutdowns Begin,SPY,Negative
+2020-03-18,Market Volatility Reaches Historic Levels,SPY,Negative
+2020-03-23,Fed Announces Unlimited QE to Support Economy,SPY,Positive
+2020-03-24,Stocks Rally on Stimulus Package Hopes,SPY,Positive
+2020-03-27,Congress Passes $2 Trillion Stimulus Package,SPY,Positive
+2020-04-06,Market Rallies as Virus Cases Show Signs of Peaking,SPY,Positive
+2020-04-17,Oil Prices Crash to Negative Territory,SPY,Negative
+2020-04-29,Tech Giants Report Strong Earnings Despite Pandemic,QQQ,Positive
+2020-05-18,Vaccine Trial Shows Promising Results,SPY,Positive
+2020-06-08,S&P 500 Erases All Pandemic Losses,SPY,Positive
+2020-06-11,Market Drops 6% on Virus Second Wave Fears,SPY,Negative
+2020-07-13,Tech Stocks Drive Market to New Highs,QQQ,Positive
+2020-08-18,S&P 500 Hits Record High on Tech Strength,SPY,Positive
+2020-09-03,Tech Stocks Plunge as Bubble Fears Mount,QQQ,Negative
+2020-09-08,Nasdaq Drops 10% from Peak in Tech Selloff,QQQ,Negative
+2020-10-28,Stocks Fall on Virus Surge Ahead of Election,SPY,Negative
+2020-11-04,Market Rallies on Election Clarity,SPY,Positive
+2020-11-09,Vaccine Breakthrough Sends Stocks Soaring,SPY,Positive
+2020-11-16,Moderna Vaccine Shows 95% Effectiveness,SPY,Positive
+2020-11-24,Dow Tops 30000 for First Time Ever,SPY,Positive
+2020-12-21,New Stimulus Deal Reached,SPY,Positive
+2021-01-06,Democrats Win Senate Control,SPY,Positive
+2021-01-27,Reddit-Fueled Stocks Cause Market Volatility,SPY,Neutral
+2021-02-16,Bitcoin Surges Past $50000,SPY,Neutral
+2021-03-04,Bond Yields Surge Triggers Tech Selloff,QQQ,Negative
+2021-03-05,Stimulus Package Clears Senate,SPY,Positive
+2021-04-05,S&P 500 Hits Record High on Economic Recovery,SPY,Positive
+2021-04-14,Strong Retail Sales Data Boosts Market,SPY,Positive
+2021-05-12,Inflation Fears Hit Market,SPY,Negative
+2021-06-16,Fed Signals Rate Hikes Coming Sooner Than Expected,SPY,Negative
+2021-07-19,Market Dips on Delta Variant Concerns,SPY,Negative
+2021-09-20,Evergrande Crisis Rattles Global Markets,SPY,Negative
+2021-10-04,Market Rebounds as Earnings Season Begins,SPY,Positive
+2021-11-08,Inflation Hits 30-Year High,SPY,Negative
+2021-11-22,Market Rallies on Black Friday Shopping Data,SPY,Positive
+2021-11-26,Omicron Variant Triggers Global Selloff,SPY,Negative
+2021-12-15,Fed Signals Faster Taper,SPY,Negative
+2022-01-05,Fed Minutes Show Aggressive Rate Hike Plans,SPY,Negative
+2022-01-24,Tech Stocks Enter Correction on Rate Fears,QQQ,Negative
+2022-02-10,Inflation Reaches 40-Year High,SPY,Negative
+2022-02-24,Russia Invades Ukraine,SPY,Negative
+2022-03-16,Fed Raises Interest Rates for First Time Since 2018,SPY,Negative
+2022-04-29,GDP Contracts in First Quarter,SPY,Negative
+2022-05-04,Fed Raises Rates by Half Point,SPY,Negative
+2022-05-18,Market Enters Bear Territory,SPY,Negative
+2022-06-10,Inflation Hits New 40-Year High,SPY,Negative
+2022-06-13,S&P 500 Enters Bear Market,SPY,Negative
+2022-06-15,Fed Raises Rates by 75 Basis Points,SPY,Negative
+2022-07-13,Inflation Shows Signs of Peaking,SPY,Positive
+2022-07-21,Nasdaq Rallies 20% from Lows,QQQ,Positive
+2022-08-26,Powell Signals Higher Rates for Longer,SPY,Negative
+2022-09-13,Inflation Remains Stubbornly High,SPY,Negative
+2022-09-21,Fed Raises Rates Another 75 Basis Points,SPY,Negative
+2022-10-13,Market Rallies on Soft Inflation Data Hopes,SPY,Positive
+2022-11-02,Fed Raises Rates by 75 Basis Points Again,SPY,Negative
+2022-11-10,Inflation Shows Signs of Cooling,SPY,Positive
+2022-12-13,Fed Raises Rates by 50 Basis Points,SPY,Negative
+2023-01-06,Strong Jobs Report Boosts Market,SPY,Positive
+2023-02-01,Fed Raises Rates by Quarter Point,SPY,Negative
+2023-02-14,Inflation Continues to Decline,SPY,Positive
+2023-03-10,Silicon Valley Bank Fails,SPY,Negative
+2023-03-13,Banking Crisis Spreads as Credit Suisse Wobbles,SPY,Negative
+2023-03-22,Fed Raises Rates Despite Banking Turmoil,SPY,Negative
+2023-04-14,Market Rallies as Earnings Season Begins Strong,SPY,Positive
+2023-05-03,Fed Raises Rates by Quarter Point,SPY,Negative
+2023-06-01,Debt Ceiling Deal Reached,SPY,Positive
+2023-06-14,Fed Pauses Rate Hikes,SPY,Positive
+2023-07-26,Tech Earnings Drive Market Higher,QQQ,Positive
+2023-07-27,Fed Raises Rates by Quarter Point,SPY,Negative
+2023-08-25,Powell Signals Rates May Stay Higher for Longer,SPY,Negative
+2023-09-20,Fed Holds Rates Steady,SPY,Positive
+2023-10-07,Strong Jobs Report Pushes Bond Yields Higher,SPY,Neutral
+2023-10-26,Tech Giants Report Strong AI-Driven Earnings,QQQ,Positive
+2023-11-01,Fed Holds Rates Steady Again,SPY,Positive
+2023-11-14,Inflation Falls to Lowest Level Since 2021,SPY,Positive
+2023-12-13,Fed Signals Rate Cuts Coming in 2024,SPY,Positive
+2023-12-20,Market Rallies to End Strong Year,SPY,Positive
+2024-01-03,Market Starts Year with Strong Rally,SPY,Positive
+2024-01-31,Fed Holds Rates Steady,SPY,Neutral
+2024-02-13,Inflation Ticks Higher Than Expected,SPY,Negative
+2024-03-20,Fed Signals Three Rate Cuts Still Possible,SPY,Positive
+2024-04-10,Inflation Remains Sticky,SPY,Negative
+2024-05-01,Fed Holds Rates Steady,SPY,Neutral
+2024-05-22,Tech Stocks Rally on AI Optimism,QQQ,Positive
+2024-06-12,Fed Holds Rates Steady Again,SPY,Neutral
+2024-07-11,Inflation Shows Signs of Moderating,SPY,Positive
+2024-07-31,Fed Holds Rates Steady,SPY,Neutral
+2024-08-05,Jobs Report Sparks Recession Fears,SPY,Negative
+2024-09-18,Fed Cuts Rates by Half Point,SPY,Positive
+2024-10-10,Market Rallies on Strong Tech Earnings,QQQ,Positive
+2024-11-07,Fed Cuts Rates by Quarter Point,SPY,Positive
+2024-12-18,Fed Cuts Rates Again But Signals Slower Pace,SPY,Neutral

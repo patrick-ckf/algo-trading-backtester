@@ -17,6 +17,7 @@ from backtester.metrics import PerformanceMetrics, calculate_buy_and_hold
 from backtester.strategies.sma_crossover import SMACrossover
 from backtester.strategies.rsi_mean_reversion import RSIMeanReversion
 from backtester.economic_calendar import EconomicCalendar, calculate_research_metrics
+from backtester.news import NewsPanel
 from backtester.ticker_presets import (
     get_grouped_ticker_options,
     is_separator,
@@ -369,6 +370,19 @@ def main():
                         )
         
         st.markdown("---")
+        st.subheader("📰 新聞研究 / News Research")
+        st.caption("L1 研究層：顯示與對齊 / L1 Research: Display & Alignment")
+        
+        show_news = st.checkbox(
+            "顯示新聞（研究）/ Show News (Research)",
+            value=False,
+            help="顯示回測期間的新聞標題（僅供研究參考，不影響回測結果）/ Display news headlines during backtest period (research only, does not affect backtest results)"
+        )
+        
+        if show_news:
+            st.caption("⚠️ 研究用途、非完整歷史 / For research only, not comprehensive historical coverage")
+        
+        st.markdown("---")
         run_backtest = st.button("🚀 運行回測 / Run Backtest", use_container_width=True)
     
     if run_backtest:
@@ -448,6 +462,22 @@ def main():
                         event_types=calendar_event_types if calendar_event_types else None,
                     )
             
+            # Load news panel if enabled (L1 layer - does not affect L0 backtest)
+            news_items = None
+            news_loaded = False
+            news_source = "none"
+            if show_news:
+                news_panel = NewsPanel()
+                # Try to load news (prefer sample CSV for reproducibility)
+                if news_panel.load(symbol=symbol, start_date=data.index.min(), end_date=data.index.max()):
+                    news_loaded = True
+                    news_source = news_panel.get_data_source()
+                    news_items = news_panel.filter_by_date_range(
+                        start_date=data.index.min(),
+                        end_date=data.index.max(),
+                        symbol=symbol,
+                    )
+            
             st.success("✅ 回測完成 / Backtest complete!")
             
             # Display calendar status if enabled
@@ -456,6 +486,14 @@ def main():
                     st.info(f"📅 已載入 {len(calendar_events)} 個經濟事件標記 / Loaded {len(calendar_events)} economic event markers")
                 elif show_calendar:
                     st.caption("⚠️ 經濟日曆數據未載入（優雅降級）/ Economic calendar data not loaded (graceful degradation)")
+            
+            # Display news status if enabled
+            if show_news:
+                if news_loaded and news_items is not None and not news_items.empty:
+                    source_label = "示範 CSV / Sample CSV" if news_source == "sample_csv" else "yfinance"
+                    st.info(f"📰 已載入 {len(news_items)} 則新聞（來源：{source_label}）/ Loaded {len(news_items)} news items (source: {source_label})")
+                else:
+                    st.caption("⚠️ 新聞數據未載入（優雅降級；回測結果不受影響）/ News data not loaded (graceful degradation; backtest results unaffected)")
             
             st.markdown("## 📊 績效指標 / Performance Metrics")
             
@@ -567,6 +605,33 @@ def main():
                         "🕐 時區：美東時間（US Eastern Time）｜"
                         "資料來源：靜態 CSV（可定期更新）｜"
                         "Data source: Static CSV (periodic updates) | Timezone: US Eastern"
+                    )
+            
+            # News panel (L1 display)
+            if show_news and news_loaded and news_items is not None and not news_items.empty:
+                with st.expander("📰 新聞列表 / News Headlines", expanded=False):
+                    # Format news display
+                    news_display = news_items[["Date", "Headline", "Sentiment"]].copy()
+                    news_display["Date"] = news_display["Date"].dt.strftime("%Y-%m-%d")
+                    
+                    # Add sentiment emoji
+                    sentiment_emoji = {
+                        "Positive": "🟢",
+                        "Negative": "🔴",
+                        "Neutral": "⚪",
+                    }
+                    news_display["Sentiment"] = news_display["Sentiment"].apply(
+                        lambda x: f"{sentiment_emoji.get(x, '⚪')} {x}"
+                    )
+                    
+                    st.dataframe(
+                        news_display,
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                    st.caption(
+                        f"⚠️ 研究用途、非完整歷史（來源：{news_source}）/ For research only, not comprehensive (source: {news_source})\n\n"
+                        f"💡 情緒標籤為簡單啟發式分類，僅供參考 / Sentiment labels are simple heuristic-based, for reference only"
                     )
             
             # Research filter comparison (opt-in only, shows side-by-side)
