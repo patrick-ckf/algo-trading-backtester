@@ -15,6 +15,15 @@
 
 後續會按階段加入指數快捷、經濟日曆、新聞與商蹤／財報等**研究層**。加功能前已鎖定產品邊界（回測只信 OHLCV；研究層預設只顯示、唔改訊號）：見 [docs/PHASE0-boundaries.md](docs/PHASE0-boundaries.md)。
 
+### 已完成階段
+
+- **Phase 0**：產品邊界與數據原則 → [docs/PHASE0-boundaries.md](docs/PHASE0-boundaries.md)
+- **Phase 2**：經濟日曆疊加層 ✅ → [docs/PHASE2-economic-calendar.md](docs/PHASE2-economic-calendar.md)
+  - 美國宏觀經濟數據發布日標記（CPI、NFP、FOMC、GDP）
+  - 圖表疊加顯示與事件列表
+  - 可選研究過濾：對比「避開公佈日±N天」的績效差異
+  - Phase 0 合規：L1 研究層，不修改 L0 回測引擎
+
 ## 內建策略
 
 1. **SMA 交叉策略**：快慢均線交叉信號
