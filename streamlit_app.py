@@ -33,6 +33,164 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Inject custom CSS for dual-theme support
+st.markdown("""
+<style>
+    /* === LIGHT THEME: Clean Modern Fintech Aesthetic === */
+    
+    /* Main background: soft gray */
+    [data-testid="stAppViewContainer"][data-theme="light"] {
+        background-color: #F8F9FA;
+    }
+    
+    /* Sidebar: white with subtle border */
+    [data-testid="stSidebar"][data-theme="light"] {
+        background-color: #FFFFFF;
+        border-right: 1px solid #E5E7EB;
+    }
+    
+    /* Text: high contrast */
+    [data-testid="stSidebar"][data-theme="light"] [data-testid="stMarkdownContainer"],
+    [data-theme="light"] .stMarkdown {
+        color: #1F2937;
+    }
+    
+    /* Headers: darker for emphasis */
+    [data-theme="light"] h1, [data-theme="light"] h2, [data-theme="light"] h3 {
+        color: #111827;
+    }
+    
+    /* Metric cards: white background, subtle shadow */
+    [data-theme="light"] [data-testid="stMetricValue"] {
+        color: #111827;
+        font-size: 1.5rem;
+        font-weight: 600;
+    }
+    
+    [data-theme="light"] [data-testid="stMetricLabel"] {
+        color: #6B7280;
+        font-size: 0.875rem;
+    }
+    
+    /* Expanders: white with border */
+    [data-theme="light"] [data-testid="stExpander"] {
+        background-color: #FFFFFF;
+        border: 1px solid #E5E7EB;
+        border-radius: 0.5rem;
+    }
+    
+    /* DataFrames: clean white */
+    [data-theme="light"] .stDataFrame {
+        background-color: #FFFFFF;
+        border: 1px solid #E5E7EB;
+    }
+    
+    /* Buttons: refined fintech style */
+    [data-theme="light"] .stButton > button {
+        border: 1px solid #D1D5DB;
+        background-color: #FFFFFF;
+        color: #374151;
+    }
+    
+    [data-theme="light"] .stButton > button[kind="primary"] {
+        background-color: #00D9FF;
+        color: #FFFFFF;
+        border: none;
+        font-weight: 600;
+    }
+    
+    [data-theme="light"] .stButton > button:hover {
+        border-color: #9CA3AF;
+    }
+    
+    /* Input fields: clean borders */
+    [data-theme="light"] .stTextInput > div > div > input,
+    [data-theme="light"] .stNumberInput > div > div > input,
+    [data-theme="light"] .stSelectbox > div > div > div {
+        border-color: #D1D5DB;
+        background-color: #FFFFFF;
+    }
+    
+    /* Tabs: refined look */
+    [data-theme="light"] .stTabs [data-baseweb="tab-list"] {
+        background-color: #F3F4F6;
+        border-radius: 0.5rem;
+    }
+    
+    [data-theme="light"] .stTabs [data-baseweb="tab"] {
+        color: #6B7280;
+    }
+    
+    [data-theme="light"] .stTabs [aria-selected="true"] {
+        color: #111827;
+        background-color: #FFFFFF;
+    }
+    
+    /* Info/warning boxes: subtle backgrounds */
+    [data-theme="light"] .stAlert {
+        background-color: #F0F9FF;
+        border-left: 4px solid #3B82F6;
+        color: #1E3A8A;
+    }
+    
+    /* === DARK THEME: Preserve Trading Terminal Feel === */
+    
+    [data-theme="dark"] [data-testid="stExpander"] {
+        background-color: rgba(30, 32, 39, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    [data-theme="dark"] [data-testid="stMetricValue"] {
+        font-size: 1.5rem;
+        font-weight: 600;
+    }
+    
+    /* === SHARED STYLES === */
+    
+    /* Compact spacing for KPI strip */
+    [data-testid="stHorizontalBlock"] {
+        gap: 0.5rem;
+    }
+    
+    /* Chart containers: subtle borders */
+    [data-testid="stPlotlyChart"] {
+        border-radius: 0.5rem;
+    }
+    
+    /* Scrollbar styling for both themes */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    [data-theme="light"] ::-webkit-scrollbar-track {
+        background: #F3F4F6;
+    }
+    
+    [data-theme="light"] ::-webkit-scrollbar-thumb {
+        background: #D1D5DB;
+        border-radius: 4px;
+    }
+    
+    [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+        background: #9CA3AF;
+    }
+    
+    [data-theme="dark"] ::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+    }
+    
+    [data-theme="dark"] ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+    }
+    
+    [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+</style>
+""", unsafe_allow_html=True)
+
 
 def plot_equity_curve(
     equity_df: pd.DataFrame,
@@ -40,7 +198,7 @@ def plot_equity_curve(
     event_markers: Optional[pd.DataFrame] = None,
     earnings_markers: Optional[pd.DataFrame] = None,
 ) -> go.Figure:
-    """Create equity curve chart with optional buy-and-hold benchmark and event markers."""
+    """Create equity curve chart with theme-adaptive styling."""
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=equity_df.index,
@@ -169,18 +327,25 @@ def plot_equity_curve(
         xaxis_title="日期 / Date",
         yaxis_title="權益 / Equity ($)",
         hovermode="x unified",
-        template="plotly_dark",
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
+        template="plotly",  # Neutral template that adapts to both themes
+        plot_bgcolor="rgba(0,0,0,0)",  # Transparent to inherit theme
+        paper_bgcolor="rgba(0,0,0,0)",  # Transparent to inherit theme
+        font=dict(
+            family="sans-serif",
+            size=12,
+            color="gray"  # Will adapt to theme
+        ),
         xaxis=dict(
             showgrid=True,
-            gridwidth=0.5,
-            gridcolor="rgba(128,128,128,0.2)",
+            gridwidth=1,
+            gridcolor="rgba(128,128,128,0.15)",  # Very subtle for both themes
+            zeroline=False,
         ),
         yaxis=dict(
             showgrid=True,
-            gridwidth=0.5,
-            gridcolor="rgba(128,128,128,0.2)",
+            gridwidth=1,
+            gridcolor="rgba(128,128,128,0.15)",  # Very subtle for both themes
+            zeroline=False,
         ),
         legend=dict(
             orientation="h",
@@ -188,7 +353,7 @@ def plot_equity_curve(
             y=1.02,
             xanchor="right",
             x=1,
-            bgcolor="rgba(0,0,0,0)",
+            bgcolor="rgba(0,0,0,0)",  # Transparent
         ),
         margin=dict(l=50, r=20, t=60, b=50),
     )
@@ -196,7 +361,7 @@ def plot_equity_curve(
 
 
 def plot_drawdown(equity_df: pd.DataFrame) -> go.Figure:
-    """Create drawdown chart."""
+    """Create drawdown chart with theme-adaptive styling."""
     equity = equity_df["Equity"]
     running_max = equity.expanding().max()
     drawdown = (equity - running_max) / running_max * 100
@@ -209,25 +374,32 @@ def plot_drawdown(equity_df: pd.DataFrame) -> go.Figure:
         name="回撤",
         fill="tozeroy",
         line=dict(color="#EF4444", width=2),
-        fillcolor="rgba(239, 68, 68, 0.2)",
+        fillcolor="rgba(239, 68, 68, 0.15)",  # Lighter fill for both themes
     ))
     fig.update_layout(
         title=dict(text="回撤圖 / Drawdown", font=dict(size=16, weight=600)),
         xaxis_title="日期 / Date",
         yaxis_title="回撤 / Drawdown (%)",
         hovermode="x unified",
-        template="plotly_dark",
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
+        template="plotly",  # Neutral template that adapts to both themes
+        plot_bgcolor="rgba(0,0,0,0)",  # Transparent to inherit theme
+        paper_bgcolor="rgba(0,0,0,0)",  # Transparent to inherit theme
+        font=dict(
+            family="sans-serif",
+            size=12,
+            color="gray"  # Will adapt to theme
+        ),
         xaxis=dict(
             showgrid=True,
-            gridwidth=0.5,
-            gridcolor="rgba(128,128,128,0.2)",
+            gridwidth=1,
+            gridcolor="rgba(128,128,128,0.15)",  # Very subtle for both themes
+            zeroline=False,
         ),
         yaxis=dict(
             showgrid=True,
-            gridwidth=0.5,
-            gridcolor="rgba(128,128,128,0.2)",
+            gridwidth=1,
+            gridcolor="rgba(128,128,128,0.15)",  # Very subtle for both themes
+            zeroline=False,
         ),
         margin=dict(l=50, r=20, t=60, b=50),
     )
