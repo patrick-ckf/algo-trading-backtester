@@ -277,6 +277,7 @@ streamlit run streamlit_app.py
 ### 儀表板功能
 
 - 🎯 **互動式控制面板**：選擇策略、設定參數、選擇數據源
+- 🌓 **雙主題支援**：深色交易終端風格（預設）與明亮現代介面，可透過 Settings → Theme 切換
 - 📊 **即時圖表**：權益曲線、回撤圖
 - 📈 **績效指標**：總回報、CAGR、夏普比率、勝率等
 - 📉 **買入持有基準**：與被動投資策略比較
@@ -284,6 +285,19 @@ streamlit run streamlit_app.py
 - 📥 **下載功能**：匯出交易記錄為 CSV
 - 🔄 **多種數據源**：內建範例、Yahoo Finance、上傳 CSV
 - ⚡ **快速選股（Phase 1）**：預設常用指數/ETF 快速選擇（美股、板塊、港股/亞洲、債券/商品等）
+
+### 主題切換 / Theme Switching
+
+儀表板預設為深色交易終端風格，適合長時間觀看市場數據。如需切換至明亮主題：
+
+1. 點擊右上角 ⋮ 選單
+2. 選擇 Settings
+3. 在 Theme 選項中選擇 Light 或 Dark
+
+The dashboard defaults to a dark trading terminal style. To switch to light theme:
+1. Click the ⋮ menu in the top-right
+2. Select Settings
+3. Choose Light or Dark under Theme
 
 ### 快速開始（儀表板）
 
@@ -429,6 +443,7 @@ Open your browser to http://localhost:8501 and start backtesting with the intera
 
 ### Interactive Dashboard
 - 📊 Real-time charts (equity curve, drawdown)
+- 🌓 **Dual theme support**: Dark trading terminal (default) & clean light theme, switchable via Settings → Theme
 - 🎯 Visual controls for all parameters
 - 📈 Complete performance metrics
 - 📉 Buy-and-hold benchmark comparison
@@ -436,6 +451,14 @@ Open your browser to http://localhost:8501 and start backtesting with the intera
 - 📥 Download results as CSV
 - 🔄 Multiple data sources (sample CSV, Yahoo Finance, file upload)
 - ⚡ Quick-select shortcuts (Phase 1): Preset common indices/ETFs for faster backtesting
+
+### Theme Switching
+
+The dashboard defaults to a dark trading terminal style for extended market data viewing. To switch themes:
+
+1. Click the ⋮ menu in the top-right corner
+2. Select Settings
+3. Choose your preferred theme under Theme (Light/Dark)
 
 ### Built-in Strategies
 
