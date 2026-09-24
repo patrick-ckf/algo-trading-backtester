@@ -38,8 +38,21 @@ def plot_equity_curve(
     buy_hold_df: Optional[pd.DataFrame] = None,
     event_markers: Optional[pd.DataFrame] = None,
     earnings_markers: Optional[pd.DataFrame] = None,
+    theme: str = "dark",
 ) -> go.Figure:
-    """Create equity curve chart with optional buy-and-hold benchmark and event markers."""
+    """Create equity curve chart with theme-adaptive styling."""
+    # Theme-specific colors
+    if theme == "light":
+        paper_bg = "#FFFFFF"
+        plot_bg = "#F8F9FA"
+        font_color = "#1F2937"
+        grid_color = "rgba(128,128,128,0.2)"
+    else:
+        paper_bg = "rgba(0,0,0,0)"
+        plot_bg = "rgba(0,0,0,0)"
+        font_color = "#FAFAFA"
+        grid_color = "rgba(128,128,128,0.15)"
+    
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=equity_df.index,
@@ -163,24 +176,58 @@ def plot_equity_curve(
                 ))
     
     fig.update_layout(
-        title="權益曲線 / Equity Curve",
+        title=dict(text="權益曲線 / Equity Curve", font=dict(color=font_color)),
         xaxis_title="日期 / Date",
         yaxis_title="權益 / Equity ($)",
         hovermode="x unified",
-        template="plotly_white",
+        template="plotly",
+        plot_bgcolor=plot_bg,
+        paper_bgcolor=paper_bg,
+        font=dict(
+            family="sans-serif",
+            size=12,
+            color=font_color,
+        ),
+        xaxis=dict(
+            showgrid=True,
+            gridwidth=1,
+            gridcolor=grid_color,
+            zeroline=False,
+            color=font_color,
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridwidth=1,
+            gridcolor=grid_color,
+            zeroline=False,
+            color=font_color,
+        ),
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=1.02,
             xanchor="right",
-            x=1
+            x=1,
+            font=dict(color=font_color),
         ),
     )
     return fig
 
 
-def plot_drawdown(equity_df: pd.DataFrame) -> go.Figure:
-    """Create drawdown chart."""
+def plot_drawdown(equity_df: pd.DataFrame, theme: str = "dark") -> go.Figure:
+    """Create drawdown chart with theme-adaptive styling."""
+    # Theme-specific colors
+    if theme == "light":
+        paper_bg = "#FFFFFF"
+        plot_bg = "#F8F9FA"
+        font_color = "#1F2937"
+        grid_color = "rgba(128,128,128,0.2)"
+    else:
+        paper_bg = "rgba(0,0,0,0)"
+        plot_bg = "rgba(0,0,0,0)"
+        font_color = "#FAFAFA"
+        grid_color = "rgba(128,128,128,0.15)"
+    
     equity = equity_df["Equity"]
     running_max = equity.expanding().max()
     drawdown = (equity - running_max) / running_max * 100
@@ -195,11 +242,32 @@ def plot_drawdown(equity_df: pd.DataFrame) -> go.Figure:
         line=dict(color="#EA2027", width=2),
     ))
     fig.update_layout(
-        title="回撤圖 / Drawdown",
+        title=dict(text="回撤圖 / Drawdown", font=dict(color=font_color)),
         xaxis_title="日期 / Date",
         yaxis_title="回撤 / Drawdown (%)",
         hovermode="x unified",
-        template="plotly_white",
+        template="plotly",
+        plot_bgcolor=plot_bg,
+        paper_bgcolor=paper_bg,
+        font=dict(
+            family="sans-serif",
+            size=12,
+            color=font_color,
+        ),
+        xaxis=dict(
+            showgrid=True,
+            gridwidth=1,
+            gridcolor=grid_color,
+            zeroline=False,
+            color=font_color,
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridwidth=1,
+            gridcolor=grid_color,
+            zeroline=False,
+            color=font_color,
+        ),
     )
     return fig
 
@@ -209,25 +277,278 @@ def main():
     if "theme" not in st.session_state:
         st.session_state.theme = "dark"
     
-    # Inject JavaScript to set the data-theme attribute
-    st.markdown(f"""
-    <script>
-        // Set theme on page load
-        const theme = "{st.session_state.theme}";
-        const stApp = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
-        if (stApp) {{
-            stApp.setAttribute('data-theme', theme);
-        }}
-        const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-        if (sidebar) {{
-            sidebar.setAttribute('data-theme', theme);
-        }}
-    </script>
-    """, unsafe_allow_html=True)
-    
     st.title("📈 演算法交易回測系統")
     st.markdown("**Algorithmic Trading Backtesting System**")
     st.markdown("---")
+    
+    # Inject theme-specific CSS (CSS-only approach, no JavaScript)
+    if st.session_state.theme == "light":
+        st.markdown("""
+        <style>
+            /* === LIGHT THEME: Clean Modern Fintech Aesthetic === */
+            /* Using high specificity to override config.toml dark theme */
+            
+            /* Main background: soft gray */
+            [data-testid="stAppViewContainer"],
+            [data-testid="stAppViewContainer"] > div:first-child,
+            .main .block-container {
+                background-color: #F8F9FA !important;
+            }
+            
+            /* Sidebar: white with subtle border */
+            [data-testid="stSidebar"],
+            [data-testid="stSidebar"] > div:first-child {
+                background-color: #FFFFFF !important;
+                border-right: 1px solid #E5E7EB !important;
+            }
+            
+            /* Text: high contrast dark text on light background */
+            [data-testid="stSidebar"] [data-testid="stMarkdownContainer"],
+            [data-testid="stSidebar"] label,
+            [data-testid="stSidebar"] p,
+            .stMarkdown,
+            .stMarkdown p,
+            body,
+            .main {
+                color: #1F2937 !important;
+            }
+            
+            /* Headers: darker for emphasis */
+            h1, h2, h3, h4, h5, h6 {
+                color: #111827 !important;
+            }
+            
+            /* Metric cards: dark text on light background */
+            [data-testid="stMetricValue"] {
+                color: #111827 !important;
+                font-size: 1.5rem;
+                font-weight: 600;
+            }
+            
+            [data-testid="stMetricLabel"] {
+                color: #6B7280 !important;
+                font-size: 0.875rem;
+            }
+            
+            /* Metric delta colors */
+            [data-testid="stMetricDelta"] svg {
+                fill: #10B981 !important;
+            }
+            
+            [data-testid="stMetricDelta"][data-testid*="decrease"] svg {
+                fill: #EF4444 !important;
+            }
+            
+            /* Expanders: white with border */
+            [data-testid="stExpander"] {
+                background-color: #FFFFFF !important;
+                border: 1px solid #E5E7EB !important;
+                border-radius: 0.5rem;
+            }
+            
+            [data-testid="stExpander"] details summary {
+                color: #1F2937 !important;
+            }
+            
+            /* DataFrames: clean white */
+            .stDataFrame,
+            [data-testid="stDataFrame"],
+            .dataframe {
+                background-color: #FFFFFF !important;
+                border: 1px solid #E5E7EB !important;
+                color: #1F2937 !important;
+            }
+            
+            .dataframe th,
+            .dataframe td {
+                color: #1F2937 !important;
+                background-color: #FFFFFF !important;
+            }
+            
+            .dataframe thead th {
+                background-color: #F3F4F6 !important;
+            }
+            
+            /* Buttons: refined fintech style */
+            .stButton > button {
+                border: 1px solid #D1D5DB !important;
+                background-color: #FFFFFF !important;
+                color: #374151 !important;
+            }
+            
+            .stButton > button[kind="primary"] {
+                background-color: #2E86DE !important;
+                color: #FFFFFF !important;
+                border: none !important;
+                font-weight: 600;
+            }
+            
+            .stButton > button:hover {
+                border-color: #9CA3AF !important;
+                background-color: #F9FAFB !important;
+            }
+            
+            .stButton > button[kind="primary"]:hover {
+                background-color: #1565C0 !important;
+            }
+            
+            /* Input fields: clean borders */
+            .stTextInput > div > div > input,
+            .stNumberInput > div > div > input,
+            .stSelectbox > div > div > div,
+            .stSelectbox [data-baseweb="select"],
+            input[type="text"],
+            input[type="number"] {
+                border-color: #D1D5DB !important;
+                background-color: #FFFFFF !important;
+                color: #1F2937 !important;
+            }
+            
+            /* Date input */
+            .stDateInput > div > div > input {
+                background-color: #FFFFFF !important;
+                color: #1F2937 !important;
+                border-color: #D1D5DB !important;
+            }
+            
+            /* Radio buttons */
+            .stRadio > label {
+                color: #1F2937 !important;
+            }
+            
+            .stRadio [role="radiogroup"] label {
+                color: #374151 !important;
+            }
+            
+            /* Slider */
+            .stSlider > div > div > div {
+                color: #1F2937 !important;
+            }
+            
+            /* Checkbox */
+            .stCheckbox > label {
+                color: #1F2937 !important;
+            }
+            
+            /* Tabs: refined look */
+            .stTabs [data-baseweb="tab-list"] {
+                background-color: #F3F4F6 !important;
+                border-radius: 0.5rem;
+            }
+            
+            .stTabs [data-baseweb="tab"] {
+                color: #6B7280 !important;
+            }
+            
+            .stTabs [aria-selected="true"] {
+                color: #111827 !important;
+                background-color: #FFFFFF !important;
+            }
+            
+            /* Info/warning/success boxes: subtle backgrounds */
+            .stAlert {
+                background-color: #F0F9FF !important;
+                border-left: 4px solid #3B82F6 !important;
+                color: #1E3A8A !important;
+            }
+            
+            [data-testid="stInfo"],
+            [data-testid="stWarning"],
+            [data-testid="stSuccess"],
+            [data-testid="stError"] {
+                color: #1F2937 !important;
+            }
+            
+            /* Captions */
+            .stCaption {
+                color: #6B7280 !important;
+            }
+            
+            /* Code blocks */
+            code {
+                background-color: #F3F4F6 !important;
+                color: #1F2937 !important;
+            }
+            
+            /* Spinner */
+            .stSpinner > div {
+                border-top-color: #2E86DE !important;
+            }
+            
+            /* Download button */
+            .stDownloadButton > button {
+                background-color: #FFFFFF !important;
+                color: #374151 !important;
+                border: 1px solid #D1D5DB !important;
+            }
+            
+            /* Scrollbar styling */
+            ::-webkit-scrollbar {
+                width: 8px;
+                height: 8px;
+            }
+            
+            ::-webkit-scrollbar-track {
+                background: #F3F4F6 !important;
+            }
+            
+            ::-webkit-scrollbar-thumb {
+                background: #D1D5DB !important;
+                border-radius: 4px;
+            }
+            
+            ::-webkit-scrollbar-thumb:hover {
+                background: #9CA3AF !important;
+            }
+            
+            /* Plotly chart containers */
+            [data-testid="stPlotlyChart"] {
+                border-radius: 0.5rem;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        # Dark theme: minimal overrides (config.toml handles most of it)
+        st.markdown("""
+        <style>
+            /* === DARK THEME: Trading Terminal Feel === */
+            /* Config.toml provides base dark theme, these refine it */
+            
+            [data-testid="stExpander"] {
+                background-color: rgba(30, 32, 39, 0.5) !important;
+                border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            }
+            
+            [data-testid="stMetricValue"] {
+                font-size: 1.5rem;
+                font-weight: 600;
+            }
+            
+            /* Compact spacing for KPI strip */
+            [data-testid="stHorizontalBlock"] {
+                gap: 0.5rem;
+            }
+            
+            /* Scrollbar styling */
+            ::-webkit-scrollbar {
+                width: 8px;
+                height: 8px;
+            }
+            
+            ::-webkit-scrollbar-track {
+                background: rgba(255, 255, 255, 0.05) !important;
+            }
+            
+            ::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.2) !important;
+                border-radius: 4px;
+            }
+            
+            ::-webkit-scrollbar-thumb:hover {
+                background: rgba(255, 255, 255, 0.3) !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
     
     with st.sidebar:
         # Theme toggle at the top of sidebar (mobile-friendly)
@@ -769,12 +1090,12 @@ def main():
                 chart_events = calendar_events if (show_calendar and calendar_loaded) else None
                 chart_earnings = earnings_events if (show_earnings and earnings_loaded) else None
                 st.plotly_chart(
-                    plot_equity_curve(equity_curve, buy_hold_curve, event_markers=chart_events, earnings_markers=chart_earnings),
+                    plot_equity_curve(equity_curve, buy_hold_curve, event_markers=chart_events, earnings_markers=chart_earnings, theme=st.session_state.theme),
                     use_container_width=True
                 )
             
             with tab2:
-                st.plotly_chart(plot_drawdown(equity_curve), use_container_width=True)
+                st.plotly_chart(plot_drawdown(equity_curve, theme=st.session_state.theme), use_container_width=True)
             
             st.markdown("---")
             
