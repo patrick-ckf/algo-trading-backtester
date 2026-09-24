@@ -97,3 +97,12 @@ L0  價格回測（現有系統）       ← SMA / RSI / 引擎 / metrics
 ## 8. 後續 PR 審查一句話
 
 > 呢個 PR 有冇喺用戶未 opt-in 之下，改到 L0 嘅成交或 metrics？有 → 唔合 Phase 0；無 → 先可以合規討論 L1／L2。
+
+---
+
+## 9. Phase 1 備註（已實作）
+
+✅ **允許**：側邊欄指數／ETF 快捷選（只填入 symbol；可手動輸入；說明文字）  
+❌ **唔屬於 Phase 1**：改 Yahoo 抓數邏輯、改 OHLCV 結構、把新聞情緒入數據欄、改策略預設計算方式
+
+預設清單見 `backtester/ticker_presets.py`。

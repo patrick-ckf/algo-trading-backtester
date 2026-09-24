@@ -270,6 +270,7 @@ streamlit run streamlit_app.py
 - 📋 **交易明細**：完整的交易記錄表格
 - 📥 **下載功能**：匯出交易記錄為 CSV
 - 🔄 **多種數據源**：內建範例、Yahoo Finance、上傳 CSV
+- ⚡ **快速選股（Phase 1）**：預設常用指數/ETF 快速選擇（美股、板塊、港股/亞洲、債券/商品等）
 
 ### 快速開始（儀表板）
 
@@ -421,6 +422,7 @@ Open your browser to http://localhost:8501 and start backtesting with the intera
 - 📋 Trade history table
 - 📥 Download results as CSV
 - 🔄 Multiple data sources (sample CSV, Yahoo Finance, file upload)
+- ⚡ Quick-select shortcuts (Phase 1): Preset common indices/ETFs for faster backtesting
 
 ### Built-in Strategies
 
