@@ -1,86 +1,108 @@
-# Phase 0 Boundaries
+# Phase 0：產品邊界與數據原則
 
-## Purpose
-This document defines the immutable core (Phase 0) of the backtesting system that must remain unchanged to ensure regression-free evolution.
+本文件鎖定後續加入「指數快捷、經濟日曆、新聞、商蹤／財報」時，**什麼可以變、什麼絕對唔可變**。  
+Phase 0 只係文件；唔改回測引擎或策略行為。
 
-## Core Invariants
+---
 
-### 1. Backtest Engine
-- **Path**: `backtester/engine.py`
-- **Contract**: Given identical OHLCV data and strategy parameters, the engine must produce:
-  - Same trade entries and exits (dates, prices, shares)
-  - Same final equity curve
-  - Same commission and slippage calculations
+## 1. 目的
 
-### 2. Strategy Logic
-- **Path**: `backtester/strategy.py`, `backtester/strategies/`
-- **Contract**: Strategy signal generation (`on_bar()`) must be deterministic:
-  - Same input → same signal (BUY/SELL/HOLD)
-  - No random elements in signal logic
-  - SMA and RSI calculations unchanged
+之後各階段會加研究層（Research / Context）。若果冇寫清邊界，新聞或公佈日好易「靜雞雞」影響買賣訊號，令回測唔可重現、亦難解釋。
 
-### 3. Metrics Formulas
-- **Path**: `backtester/metrics.py`
-- **Contract**: Performance metrics calculations must be stable:
-  - Total Return, CAGR, Max Drawdown, Sharpe Ratio formulas
-  - Win Rate, average trade return
-  - Buy-and-hold benchmark calculation
+Phase 0 完成標準：團隊（同未來自己）同意下面合約，並以本文件為準。
 
-### 4. Data Loading
-- **Path**: `backtester/data.py`
-- **Contract**: OHLCV data structure and cleaning:
-  - Column names: Date, Open, High, Low, Close, Volume
-  - Date parsing and sorting behavior
-  - NaN handling and cleaning rules
+---
 
-## Allowed Changes (Non-Breaking)
+## 2. 核心回測合約（不可談判）
 
-### UI/UX Improvements
-- Streamlit dashboard enhancements (colors, layout, language)
-- Input controls (e.g., Phase 1 symbol shortcuts)
-- Chart styling and descriptions
-- Default parameter values (as long as they don't change computation)
+| 項目 | 規則 |
+|------|------|
+| **權威輸入** | 策略盈虧只信 **OHLCV**，加上引擎已有嘅佣金／滑點設定 |
+| **研究層預設** | 新聞、政府數據公佈、商蹤／財報時間線 = **顯示、對齊、研究過濾** |
+| **禁止** | 預設情況下，研究層 **唔可以** 默默改買賣訊號或持倉 |
+| **將來例外** | 只有明確嘅「事件驅動策略」（預計 Phase 5）、用戶 **opt-in**、有文件假設同對照測試，先可以改訊號 |
 
-### Output Formatting
-- Display precision, units, language
-- Export formats (CSV, JSON)
-- Report templates
+### 成功標準（適用於 Phase 1–4 每一個 PR）
 
-### New Optional Features
-- Additional data sources (as long as they produce same OHLCV format)
-- New optional parameters (must not affect existing defaults)
-- Educational notes, tooltips, help text
+用同一組參數跑固定標的（建議：`SPY` 或 `data/sample/SPY_sample.csv`）：
 
-## Testing Requirements
+1. **關掉** 所有事件／新聞／商蹤 overlay → equity curve 同核心 metrics（總回報、CAGR、最大回撤、Sharpe、交易次數等）須與加功能前 **一致**。
+2. **只開顯示**（圖上標記、側欄列表）→ 價格路徑同上述 metrics 仍須 **一致**（顯示層唔准改成交）。
+3. 若某功能提供「避開公佈日」等過濾，必須係 **可開關**，並喺 UI／文件標明：呢個係研究過濾，唔係預設策略邏輯。
 
-### Phase 0 Regression Suite
-- All existing tests in `tests/` must pass
-- Key regression tests:
-  - `test_engine.py`: Core engine behavior
-  - `test_strategies.py`: Signal generation determinism
-  - `test_metrics.py`: Performance calculation accuracy
-  - `test_e2e.py`: End-to-end workflow stability
+---
 
-### New Feature Tests
-- Must include test for Phase 0 compliance
-- Must not weaken existing assertions
-- Must demonstrate that same inputs produce same outputs
+## 3. 分層模型
 
-## Phase 1 Example (Symbol Shortcuts)
+```
+L2  事件規則（可選、將來）     ← Phase 5；opt-in；要有對照組
+L1  情境疊加（顯示／對齊）     ← Phase 2–4；預設唔改訊號
+L0  價格回測（現有系統）       ← SMA / RSI / 引擎 / metrics
+```
 
-✅ **Allowed**: Quick-select UI for common symbols (SPY, QQQ, etc.)
-- Only populates the symbol input field
-- Does not change data fetching logic
-- Does not alter backtest computation
-- Manual input still works exactly as before
+- **L0**：而家嘅 `backtester` + Streamlit／CLI。唯一產生正式回測績效嘅層。
+- **L1**：經濟日曆標記、新聞列表、財報／商蹤時間線；同 equity、買賣點 **對齊顯示**。
+- **L2**：例如「FOMC 翌日先允許趨勢單」；必須獨立策略或明確規則模組，唔好藏喺 L1。
 
-❌ **Not Allowed** (for Phase 1):
-- Changing how Yahoo Finance data is fetched
-- Modifying OHLCV data structure
-- Adding new columns to data (e.g., news sentiment)
-- Changing default strategy parameters
+---
 
-## Version History
+## 4. 數據源原則
 
-- **Phase 0**: Initial stable core (engine, strategies, metrics, data loading)
-- **Phase 1**: Symbol selection UX improvements (shortcuts, descriptions)
+優先次序：**免費 → 歷史可重現 → 授權／出處清楚 → Streamlit Cloud 預設可跑**。
+
+| 類型 | 首選方向 | 備註 |
+|------|----------|------|
+| 價格 | Yahoo（yfinance）／用戶 CSV | 維持現狀；指數用對應 ticker |
+| 宏觀公佈日曆 | FRED、官方發佈時間表 | 美東時間標註來源；對用戶顯示時可同時標 **Asia/Taipei** |
+| 新聞 | 可歸因來源；允許唔完整 | UI 須標「研究用途、非完整歷史」 |
+| 商蹤／財報 | 先做 earnings calendar | 指數類標的要 **降級說明**，唔好假裝有完整成分股事件 |
+
+### Streamlit Community Cloud 硬規則
+
+- **預設唔依存付費 API key** 先能開 app、跑 L0 回測。
+- 付費或要 key 嘅來源：只可以係可選增強（環境變數），缺 key 時 L1 優雅降級（提示、空白列表），**唔可以**整頁 ImportError。
+
+---
+
+## 5. Phase 1–4 明確不做
+
+- 實盤下單、券商接駁、自動路由
+- 推送通知當交易訊號
+- 用 LLM 情緒 **直接** 當實時買賣訊號（研究標籤可以，預設入策略唔得）
+- 付費新聞全文變成硬依賴
+
+---
+
+## 6. 已同意嘅階段順序
+
+| 階段 | 內容 | 同 L0 關係 |
+|------|------|------------|
+| **0** | 本文件：邊界與原則 | 只文件 |
+| **1** | 指數／ETF 快捷清單 | 只改輸入體驗 |
+| **2** | 政府數據公佈日曆標記（+ 可選避開過濾） | L1；過濾須可關 |
+| **3** | 新聞研究面板 | L1 顯示 |
+| **4** | 商蹤／財報時間線 | L1 顯示 |
+| **5**（可選） | 事件驅動策略原型 | L2；要對照測試 |
+
+---
+
+## 7. Phase 0 完成檢查清單
+
+- [x] 本文件存在於 `docs/PHASE0-boundaries.md`
+- [x] README 有連結指向本文件
+- [x] 本變更 **唔改** `backtester/` 與回測行為（docs-only）
+
+---
+
+## 8. 後續 PR 審查一句話
+
+> 呢個 PR 有冇喺用戶未 opt-in 之下，改到 L0 嘅成交或 metrics？有 → 唔合 Phase 0；無 → 先可以合規討論 L1／L2。
+
+---
+
+## 9. Phase 1 備註（已實作）
+
+✅ **允許**：側邊欄指數／ETF 快捷選（只填入 symbol；可手動輸入；說明文字）  
+❌ **唔屬於 Phase 1**：改 Yahoo 抓數邏輯、改 OHLCV 結構、把新聞情緒入數據欄、改策略預設計算方式
+
+預設清單見 `backtester/ticker_presets.py`。
