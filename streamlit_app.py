@@ -33,163 +33,9 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Inject custom CSS for dual-theme support
-st.markdown("""
-<style>
-    /* === LIGHT THEME: Clean Modern Fintech Aesthetic === */
-    
-    /* Main background: soft gray */
-    [data-testid="stAppViewContainer"][data-theme="light"] {
-        background-color: #F8F9FA;
-    }
-    
-    /* Sidebar: white with subtle border */
-    [data-testid="stSidebar"][data-theme="light"] {
-        background-color: #FFFFFF;
-        border-right: 1px solid #E5E7EB;
-    }
-    
-    /* Text: high contrast */
-    [data-testid="stSidebar"][data-theme="light"] [data-testid="stMarkdownContainer"],
-    [data-theme="light"] .stMarkdown {
-        color: #1F2937;
-    }
-    
-    /* Headers: darker for emphasis */
-    [data-theme="light"] h1, [data-theme="light"] h2, [data-theme="light"] h3 {
-        color: #111827;
-    }
-    
-    /* Metric cards: white background, subtle shadow */
-    [data-theme="light"] [data-testid="stMetricValue"] {
-        color: #111827;
-        font-size: 1.5rem;
-        font-weight: 600;
-    }
-    
-    [data-theme="light"] [data-testid="stMetricLabel"] {
-        color: #6B7280;
-        font-size: 0.875rem;
-    }
-    
-    /* Expanders: white with border */
-    [data-theme="light"] [data-testid="stExpander"] {
-        background-color: #FFFFFF;
-        border: 1px solid #E5E7EB;
-        border-radius: 0.5rem;
-    }
-    
-    /* DataFrames: clean white */
-    [data-theme="light"] .stDataFrame {
-        background-color: #FFFFFF;
-        border: 1px solid #E5E7EB;
-    }
-    
-    /* Buttons: refined fintech style */
-    [data-theme="light"] .stButton > button {
-        border: 1px solid #D1D5DB;
-        background-color: #FFFFFF;
-        color: #374151;
-    }
-    
-    [data-theme="light"] .stButton > button[kind="primary"] {
-        background-color: #00D9FF;
-        color: #FFFFFF;
-        border: none;
-        font-weight: 600;
-    }
-    
-    [data-theme="light"] .stButton > button:hover {
-        border-color: #9CA3AF;
-    }
-    
-    /* Input fields: clean borders */
-    [data-theme="light"] .stTextInput > div > div > input,
-    [data-theme="light"] .stNumberInput > div > div > input,
-    [data-theme="light"] .stSelectbox > div > div > div {
-        border-color: #D1D5DB;
-        background-color: #FFFFFF;
-    }
-    
-    /* Tabs: refined look */
-    [data-theme="light"] .stTabs [data-baseweb="tab-list"] {
-        background-color: #F3F4F6;
-        border-radius: 0.5rem;
-    }
-    
-    [data-theme="light"] .stTabs [data-baseweb="tab"] {
-        color: #6B7280;
-    }
-    
-    [data-theme="light"] .stTabs [aria-selected="true"] {
-        color: #111827;
-        background-color: #FFFFFF;
-    }
-    
-    /* Info/warning boxes: subtle backgrounds */
-    [data-theme="light"] .stAlert {
-        background-color: #F0F9FF;
-        border-left: 4px solid #3B82F6;
-        color: #1E3A8A;
-    }
-    
-    /* === DARK THEME: Preserve Trading Terminal Feel === */
-    
-    [data-theme="dark"] [data-testid="stExpander"] {
-        background-color: rgba(30, 32, 39, 0.5);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    [data-theme="dark"] [data-testid="stMetricValue"] {
-        font-size: 1.5rem;
-        font-weight: 600;
-    }
-    
-    /* === SHARED STYLES === */
-    
-    /* Compact spacing for KPI strip */
-    [data-testid="stHorizontalBlock"] {
-        gap: 0.5rem;
-    }
-    
-    /* Chart containers: subtle borders */
-    [data-testid="stPlotlyChart"] {
-        border-radius: 0.5rem;
-    }
-    
-    /* Scrollbar styling for both themes */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    
-    [data-theme="light"] ::-webkit-scrollbar-track {
-        background: #F3F4F6;
-    }
-    
-    [data-theme="light"] ::-webkit-scrollbar-thumb {
-        background: #D1D5DB;
-        border-radius: 4px;
-    }
-    
-    [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
-        background: #9CA3AF;
-    }
-    
-    [data-theme="dark"] ::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.05);
-    }
-    
-    [data-theme="dark"] ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 4px;
-    }
-    
-    [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.3);
-    }
-</style>
-""", unsafe_allow_html=True)
+# Initialize theme in session state
+if "theme" not in st.session_state:
+    st.session_state.theme = "dark"
 
 
 def plot_equity_curve(
@@ -197,8 +43,21 @@ def plot_equity_curve(
     buy_hold_df: Optional[pd.DataFrame] = None,
     event_markers: Optional[pd.DataFrame] = None,
     earnings_markers: Optional[pd.DataFrame] = None,
+    theme: str = "dark",
 ) -> go.Figure:
     """Create equity curve chart with theme-adaptive styling."""
+    # Theme-specific colors
+    if theme == "light":
+        paper_bg = "#FFFFFF"
+        plot_bg = "#F8F9FA"
+        font_color = "#1F2937"
+        grid_color = "rgba(128,128,128,0.2)"
+    else:
+        paper_bg = "rgba(0,0,0,0)"
+        plot_bg = "rgba(0,0,0,0)"
+        font_color = "#FAFAFA"
+        grid_color = "rgba(128,128,128,0.15)"
+    
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=equity_df.index,
@@ -323,29 +182,31 @@ def plot_equity_curve(
                 ))
     
     fig.update_layout(
-        title=dict(text="權益曲線 / Equity Curve", font=dict(size=16, weight=600)),
+        title=dict(text="權益曲線 / Equity Curve", font=dict(size=16, weight=600, color=font_color)),
         xaxis_title="日期 / Date",
         yaxis_title="權益 / Equity ($)",
         hovermode="x unified",
-        template="plotly",  # Neutral template that adapts to both themes
-        plot_bgcolor="rgba(0,0,0,0)",  # Transparent to inherit theme
-        paper_bgcolor="rgba(0,0,0,0)",  # Transparent to inherit theme
+        template="plotly",
+        plot_bgcolor=plot_bg,
+        paper_bgcolor=paper_bg,
         font=dict(
             family="sans-serif",
             size=12,
-            color="gray"  # Will adapt to theme
+            color=font_color,
         ),
         xaxis=dict(
             showgrid=True,
             gridwidth=1,
-            gridcolor="rgba(128,128,128,0.15)",  # Very subtle for both themes
+            gridcolor=grid_color,
             zeroline=False,
+            color=font_color,
         ),
         yaxis=dict(
             showgrid=True,
             gridwidth=1,
-            gridcolor="rgba(128,128,128,0.15)",  # Very subtle for both themes
+            gridcolor=grid_color,
             zeroline=False,
+            color=font_color,
         ),
         legend=dict(
             orientation="h",
@@ -353,15 +214,28 @@ def plot_equity_curve(
             y=1.02,
             xanchor="right",
             x=1,
-            bgcolor="rgba(0,0,0,0)",  # Transparent
+            bgcolor="rgba(0,0,0,0)",
+            font=dict(color=font_color),
         ),
         margin=dict(l=50, r=20, t=60, b=50),
     )
     return fig
 
 
-def plot_drawdown(equity_df: pd.DataFrame) -> go.Figure:
+def plot_drawdown(equity_df: pd.DataFrame, theme: str = "dark") -> go.Figure:
     """Create drawdown chart with theme-adaptive styling."""
+    # Theme-specific colors
+    if theme == "light":
+        paper_bg = "#FFFFFF"
+        plot_bg = "#F8F9FA"
+        font_color = "#1F2937"
+        grid_color = "rgba(128,128,128,0.2)"
+    else:
+        paper_bg = "rgba(0,0,0,0)"
+        plot_bg = "rgba(0,0,0,0)"
+        font_color = "#FAFAFA"
+        grid_color = "rgba(128,128,128,0.15)"
+    
     equity = equity_df["Equity"]
     running_max = equity.expanding().max()
     drawdown = (equity - running_max) / running_max * 100
@@ -374,32 +248,34 @@ def plot_drawdown(equity_df: pd.DataFrame) -> go.Figure:
         name="回撤",
         fill="tozeroy",
         line=dict(color="#EF4444", width=2),
-        fillcolor="rgba(239, 68, 68, 0.15)",  # Lighter fill for both themes
+        fillcolor="rgba(239, 68, 68, 0.15)",
     ))
     fig.update_layout(
-        title=dict(text="回撤圖 / Drawdown", font=dict(size=16, weight=600)),
+        title=dict(text="回撤圖 / Drawdown", font=dict(size=16, weight=600, color=font_color)),
         xaxis_title="日期 / Date",
         yaxis_title="回撤 / Drawdown (%)",
         hovermode="x unified",
-        template="plotly",  # Neutral template that adapts to both themes
-        plot_bgcolor="rgba(0,0,0,0)",  # Transparent to inherit theme
-        paper_bgcolor="rgba(0,0,0,0)",  # Transparent to inherit theme
+        template="plotly",
+        plot_bgcolor=plot_bg,
+        paper_bgcolor=paper_bg,
         font=dict(
             family="sans-serif",
             size=12,
-            color="gray"  # Will adapt to theme
+            color=font_color,
         ),
         xaxis=dict(
             showgrid=True,
             gridwidth=1,
-            gridcolor="rgba(128,128,128,0.15)",  # Very subtle for both themes
+            gridcolor=grid_color,
             zeroline=False,
+            color=font_color,
         ),
         yaxis=dict(
             showgrid=True,
             gridwidth=1,
-            gridcolor="rgba(128,128,128,0.15)",  # Very subtle for both themes
+            gridcolor=grid_color,
             zeroline=False,
+            color=font_color,
         ),
         margin=dict(l=50, r=20, t=60, b=50),
     )
@@ -413,10 +289,295 @@ def main():
     with st.sidebar:
         st.header("設定面板 / Settings")
         
+        # Theme selector (bilingual, mobile-friendly)
+        st.subheader("主題 / Theme")
+        theme_choice = st.radio(
+            "選擇主題 / Select Theme",
+            options=["深色 / Dark", "淺色 / Light"],
+            index=0 if st.session_state.theme == "dark" else 1,
+            label_visibility="collapsed",
+            horizontal=True,
+        )
+        st.session_state.theme = "dark" if theme_choice == "深色 / Dark" else "light"
+        
+        st.markdown("---")
+        
         strategy_type = st.selectbox(
             "策略 / Strategy",
             ["SMA Crossover", "RSI Mean Reversion"],
         )
+    
+    # Inject theme-specific CSS (CSS-only approach, no JavaScript)
+    if st.session_state.theme == "light":
+        st.markdown("""
+        <style>
+            /* === LIGHT THEME: Clean Modern Fintech Aesthetic === */
+            /* Using high specificity to override config.toml dark theme */
+            
+            /* Main background: soft gray */
+            [data-testid="stAppViewContainer"],
+            [data-testid="stAppViewContainer"] > div:first-child,
+            .main .block-container {
+                background-color: #F8F9FA !important;
+            }
+            
+            /* Sidebar: white with subtle border */
+            [data-testid="stSidebar"],
+            [data-testid="stSidebar"] > div:first-child {
+                background-color: #FFFFFF !important;
+                border-right: 1px solid #E5E7EB !important;
+            }
+            
+            /* Text: high contrast dark text on light background */
+            [data-testid="stSidebar"] [data-testid="stMarkdownContainer"],
+            [data-testid="stSidebar"] label,
+            [data-testid="stSidebar"] p,
+            .stMarkdown,
+            .stMarkdown p,
+            body,
+            .main {
+                color: #1F2937 !important;
+            }
+            
+            /* Headers: darker for emphasis */
+            h1, h2, h3, h4, h5, h6 {
+                color: #111827 !important;
+            }
+            
+            /* Metric cards: dark text on light background */
+            [data-testid="stMetricValue"] {
+                color: #111827 !important;
+                font-size: 1.5rem;
+                font-weight: 600;
+            }
+            
+            [data-testid="stMetricLabel"] {
+                color: #6B7280 !important;
+                font-size: 0.875rem;
+            }
+            
+            /* Metric delta colors */
+            [data-testid="stMetricDelta"] svg {
+                fill: #10B981 !important;
+            }
+            
+            [data-testid="stMetricDelta"][data-testid*="decrease"] svg {
+                fill: #EF4444 !important;
+            }
+            
+            /* Expanders: white with border */
+            [data-testid="stExpander"] {
+                background-color: #FFFFFF !important;
+                border: 1px solid #E5E7EB !important;
+                border-radius: 0.5rem;
+            }
+            
+            [data-testid="stExpander"] details summary {
+                color: #1F2937 !important;
+            }
+            
+            /* DataFrames: clean white */
+            .stDataFrame,
+            [data-testid="stDataFrame"],
+            .dataframe {
+                background-color: #FFFFFF !important;
+                border: 1px solid #E5E7EB !important;
+                color: #1F2937 !important;
+            }
+            
+            .dataframe th,
+            .dataframe td {
+                color: #1F2937 !important;
+                background-color: #FFFFFF !important;
+            }
+            
+            .dataframe thead th {
+                background-color: #F3F4F6 !important;
+            }
+            
+            /* Buttons: refined fintech style */
+            .stButton > button {
+                border: 1px solid #D1D5DB !important;
+                background-color: #FFFFFF !important;
+                color: #374151 !important;
+            }
+            
+            .stButton > button[kind="primary"] {
+                background-color: #00D9FF !important;
+                color: #FFFFFF !important;
+                border: none !important;
+                font-weight: 600;
+            }
+            
+            .stButton > button:hover {
+                border-color: #9CA3AF !important;
+                background-color: #F9FAFB !important;
+            }
+            
+            .stButton > button[kind="primary"]:hover {
+                background-color: #00B8D4 !important;
+            }
+            
+            /* Input fields: clean borders */
+            .stTextInput > div > div > input,
+            .stNumberInput > div > div > input,
+            .stSelectbox > div > div > div,
+            .stSelectbox [data-baseweb="select"],
+            input[type="text"],
+            input[type="number"] {
+                border-color: #D1D5DB !important;
+                background-color: #FFFFFF !important;
+                color: #1F2937 !important;
+            }
+            
+            /* Date input */
+            .stDateInput > div > div > input {
+                background-color: #FFFFFF !important;
+                color: #1F2937 !important;
+                border-color: #D1D5DB !important;
+            }
+            
+            /* Radio buttons */
+            .stRadio > label {
+                color: #1F2937 !important;
+            }
+            
+            .stRadio [role="radiogroup"] label {
+                color: #374151 !important;
+            }
+            
+            /* Slider */
+            .stSlider > div > div > div {
+                color: #1F2937 !important;
+            }
+            
+            /* Checkbox */
+            .stCheckbox > label {
+                color: #1F2937 !important;
+            }
+            
+            /* Tabs: refined look */
+            .stTabs [data-baseweb="tab-list"] {
+                background-color: #F3F4F6 !important;
+                border-radius: 0.5rem;
+            }
+            
+            .stTabs [data-baseweb="tab"] {
+                color: #6B7280 !important;
+            }
+            
+            .stTabs [aria-selected="true"] {
+                color: #111827 !important;
+                background-color: #FFFFFF !important;
+            }
+            
+            /* Info/warning/success boxes: subtle backgrounds */
+            .stAlert {
+                background-color: #F0F9FF !important;
+                border-left: 4px solid #3B82F6 !important;
+                color: #1E3A8A !important;
+            }
+            
+            [data-testid="stInfo"],
+            [data-testid="stWarning"],
+            [data-testid="stSuccess"],
+            [data-testid="stError"] {
+                color: #1F2937 !important;
+            }
+            
+            /* Captions */
+            .stCaption {
+                color: #6B7280 !important;
+            }
+            
+            /* Code blocks */
+            code {
+                background-color: #F3F4F6 !important;
+                color: #1F2937 !important;
+            }
+            
+            /* Spinner */
+            .stSpinner > div {
+                border-top-color: #00D9FF !important;
+            }
+            
+            /* Download button */
+            .stDownloadButton > button {
+                background-color: #FFFFFF !important;
+                color: #374151 !important;
+                border: 1px solid #D1D5DB !important;
+            }
+            
+            /* Scrollbar styling */
+            ::-webkit-scrollbar {
+                width: 8px;
+                height: 8px;
+            }
+            
+            ::-webkit-scrollbar-track {
+                background: #F3F4F6 !important;
+            }
+            
+            ::-webkit-scrollbar-thumb {
+                background: #D1D5DB !important;
+                border-radius: 4px;
+            }
+            
+            ::-webkit-scrollbar-thumb:hover {
+                background: #9CA3AF !important;
+            }
+            
+            /* Plotly chart containers */
+            [data-testid="stPlotlyChart"] {
+                border-radius: 0.5rem;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        # Dark theme: minimal overrides (config.toml handles most of it)
+        st.markdown("""
+        <style>
+            /* === DARK THEME: Trading Terminal Feel === */
+            /* Config.toml provides base dark theme, these refine it */
+            
+            [data-testid="stExpander"] {
+                background-color: rgba(30, 32, 39, 0.5) !important;
+                border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            }
+            
+            [data-testid="stMetricValue"] {
+                font-size: 1.5rem;
+                font-weight: 600;
+            }
+            
+            /* Compact spacing for KPI strip */
+            [data-testid="stHorizontalBlock"] {
+                gap: 0.5rem;
+            }
+            
+            /* Scrollbar styling */
+            ::-webkit-scrollbar {
+                width: 8px;
+                height: 8px;
+            }
+            
+            ::-webkit-scrollbar-track {
+                background: rgba(255, 255, 255, 0.05) !important;
+            }
+            
+            ::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.2) !important;
+                border-radius: 4px;
+            }
+            
+            ::-webkit-scrollbar-thumb:hover {
+                background: rgba(255, 255, 255, 0.3) !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+    
+    # Continue with sidebar configuration
+    with st.sidebar:
         
         st.subheader("數據來源 / Data Source")
         data_source = st.radio(
@@ -924,12 +1085,12 @@ def main():
                 chart_events = calendar_events if (show_calendar and calendar_loaded) else None
                 chart_earnings = earnings_events if (show_earnings and earnings_loaded) else None
                 st.plotly_chart(
-                    plot_equity_curve(equity_curve, buy_hold_curve, event_markers=chart_events, earnings_markers=chart_earnings),
+                    plot_equity_curve(equity_curve, buy_hold_curve, event_markers=chart_events, earnings_markers=chart_earnings, theme=st.session_state.theme),
                     use_container_width=True
                 )
             
             with tab2:
-                st.plotly_chart(plot_drawdown(equity_curve), use_container_width=True)
+                st.plotly_chart(plot_drawdown(equity_curve, theme=st.session_state.theme), use_container_width=True)
             
             # Details sections in expanders
             # Economic events table (L1 display)
