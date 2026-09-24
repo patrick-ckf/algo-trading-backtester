@@ -6,6 +6,11 @@ Tests that the dashboard can properly call the backtesting engine.
 import pytest
 import pandas as pd
 from pathlib import Path
+import sys
+import os
+
+# Add parent directory to path to import streamlit_app
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backtester.data import DataLoader
 from backtester.engine import BacktestEngine
@@ -95,6 +100,55 @@ def test_trades_dataframe_export():
     trades_df = engine.get_trades_df()
     
     assert isinstance(trades_df, pd.DataFrame)
+
+
+def test_plot_equity_curve_with_tz_aware_index():
+    """
+    Test that plot_equity_curve handles timezone-aware equity index
+    and naive event dates without TypeError.
+    
+    Reproduces the bug: equity index from yfinance is tz-aware (America/New_York),
+    but calendar/earnings event dates are naive datetime64[us].
+    """
+    from streamlit_app import plot_equity_curve
+    
+    # Create tz-aware equity curve (like yfinance returns)
+    dates = pd.date_range("2024-01-01", periods=10, freq="D", tz="America/New_York")
+    equity_df = pd.DataFrame({
+        "Equity": [10000 + i * 100 for i in range(10)]
+    }, index=dates)
+    
+    # Create naive event markers (like calendar CSV parsing)
+    event_dates = pd.to_datetime(["2024-01-03", "2024-01-07"])
+    event_markers = pd.DataFrame({
+        "Date": event_dates,
+        "Event": ["CPI Release", "NFP Release"],
+        "Type": ["CPI", "NFP"],
+        "Country": ["US", "US"]
+    })
+    
+    # Create naive earnings markers
+    earnings_dates = pd.to_datetime(["2024-01-05"])
+    earnings_markers = pd.DataFrame({
+        "Date": earnings_dates,
+        "Symbol": ["AAPL"],
+        "Event": ["Q4 Earnings"]
+    })
+    
+    # This should not raise TypeError about datetime64 comparison
+    try:
+        fig = plot_equity_curve(
+            equity_df=equity_df,
+            event_markers=event_markers,
+            earnings_markers=earnings_markers
+        )
+        # Verify figure was created
+        assert fig is not None
+        assert len(fig.data) > 0  # Should have at least equity curve trace
+    except TypeError as e:
+        if "Cannot compare dtypes" in str(e):
+            pytest.fail(f"Timezone comparison bug not fixed: {e}")
+        raise
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ from backtester.engine import BacktestEngine
 from backtester.metrics import PerformanceMetrics, calculate_buy_and_hold
 from backtester.strategies.sma_crossover import SMACrossover
 from backtester.strategies.rsi_mean_reversion import RSIMeanReversion
-from backtester.economic_calendar import EconomicCalendar, calculate_research_metrics
+from backtester.economic_calendar import EconomicCalendar, calculate_research_metrics, _to_naive_day
 from backtester.news import NewsPanel
 from backtester.earnings_calendar import EarningsCalendar
 from backtester.ticker_presets import (
@@ -58,6 +58,9 @@ def plot_equity_curve(
             line=dict(color="#95A5A6", width=2, dash="dash"),
         ))
     
+    # Normalize equity index to naive days for marker alignment (handles tz-aware yfinance data)
+    equity_index_naive = pd.DatetimeIndex([_to_naive_day(d) for d in equity_df.index])
+    
     # Add economic event markers (L1 display layer - does not affect L0 backtest)
     if event_markers is not None and not event_markers.empty:
         # Group by event type for color coding
@@ -76,16 +79,20 @@ def plot_equity_curve(
             y_values = []
             x_values = []
             for event_date in type_events["Date"]:
-                # Find closest equity value
-                if event_date in equity_df.index:
-                    y_values.append(equity_df.loc[event_date, "Equity"])
-                    x_values.append(event_date)
+                # Normalize event date for comparison
+                event_date_naive = _to_naive_day(event_date)
+                
+                # Find closest equity value using normalized dates
+                if event_date_naive in equity_index_naive:
+                    idx_pos = equity_index_naive.get_loc(event_date_naive)
+                    y_values.append(equity_df.iloc[idx_pos]["Equity"])
+                    x_values.append(equity_df.index[idx_pos])
                 else:
-                    # Find nearest date
-                    nearest_idx = equity_df.index.get_indexer([event_date], method="nearest")[0]
+                    # Find nearest date using normalized index
+                    nearest_idx = equity_index_naive.get_indexer([event_date_naive], method="nearest")[0]
                     if 0 <= nearest_idx < len(equity_df):
                         y_values.append(equity_df.iloc[nearest_idx]["Equity"])
-                        x_values.append(event_date)
+                        x_values.append(equity_df.index[nearest_idx])
             
             if x_values and y_values:
                 fig.add_trace(go.Scatter(
@@ -120,18 +127,24 @@ def plot_equity_curve(
             hover_texts = []
             for _, row in symbol_events.iterrows():
                 event_date = row["Date"]
-                # Find closest equity value
-                if event_date in equity_df.index:
-                    y_values.append(equity_df.loc[event_date, "Equity"])
-                    x_values.append(event_date)
-                    hover_texts.append(f"<b>{event_date.strftime('%Y-%m-%d')}</b><br>{row['Event']}<br>權益: ${equity_df.loc[event_date, 'Equity']:,.0f}")
+                # Normalize event date for comparison
+                event_date_naive = _to_naive_day(event_date)
+                
+                # Find closest equity value using normalized dates
+                if event_date_naive in equity_index_naive:
+                    idx_pos = equity_index_naive.get_loc(event_date_naive)
+                    equity_val = equity_df.iloc[idx_pos]["Equity"]
+                    y_values.append(equity_val)
+                    x_values.append(equity_df.index[idx_pos])
+                    hover_texts.append(f"<b>{event_date_naive.strftime('%Y-%m-%d')}</b><br>{row['Event']}<br>權益: ${equity_val:,.0f}")
                 else:
-                    # Find nearest date
-                    nearest_idx = equity_df.index.get_indexer([event_date], method="nearest")[0]
+                    # Find nearest date using normalized index
+                    nearest_idx = equity_index_naive.get_indexer([event_date_naive], method="nearest")[0]
                     if 0 <= nearest_idx < len(equity_df):
-                        y_values.append(equity_df.iloc[nearest_idx]["Equity"])
-                        x_values.append(event_date)
-                        hover_texts.append(f"<b>{event_date.strftime('%Y-%m-%d')}</b><br>{row['Event']}<br>權益: ${equity_df.iloc[nearest_idx]['Equity']:,.0f}")
+                        equity_val = equity_df.iloc[nearest_idx]["Equity"]
+                        y_values.append(equity_val)
+                        x_values.append(equity_df.index[nearest_idx])
+                        hover_texts.append(f"<b>{event_date_naive.strftime('%Y-%m-%d')}</b><br>{row['Event']}<br>權益: ${equity_val:,.0f}")
             
             if x_values and y_values:
                 fig.add_trace(go.Scatter(
