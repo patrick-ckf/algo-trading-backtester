@@ -20,7 +20,7 @@
 - ✅ **Phase 1**: 指數／ETF 快捷清單 / Index/ETF presets
 - ✅ **Phase 2**: 經濟日曆疊加層 / Economic calendar overlay ([docs](docs/PHASE2-economic-calendar.md))
 - ✅ **Phase 3**: 新聞研究面板 / News research panel ([docs](docs/PHASE3-news-panel.md))
-- 🚧 **Phase 4**: 財報／商蹤時間線 / Earnings timeline ([docs](docs/PHASE4-earnings-timeline.md)) - In Development
+- ✅ **Phase 4**: 財報／商蹤時間線 / Earnings timeline ([docs](docs/PHASE4-earnings-timeline.md))
 
 ### 已完成階段
 
