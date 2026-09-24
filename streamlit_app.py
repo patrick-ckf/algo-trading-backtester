@@ -30,166 +30,7 @@ st.set_page_config(
     page_title="演算法交易回測系統",
     page_icon="📈",
     layout="wide",
-    initial_sidebar_state="expanded",
 )
-
-# Inject custom CSS for dual-theme support
-st.markdown("""
-<style>
-    /* === LIGHT THEME: Clean Modern Fintech Aesthetic === */
-    
-    /* Main background: soft gray */
-    [data-testid="stAppViewContainer"][data-theme="light"] {
-        background-color: #F8F9FA;
-    }
-    
-    /* Sidebar: white with subtle border */
-    [data-testid="stSidebar"][data-theme="light"] {
-        background-color: #FFFFFF;
-        border-right: 1px solid #E5E7EB;
-    }
-    
-    /* Text: high contrast */
-    [data-testid="stSidebar"][data-theme="light"] [data-testid="stMarkdownContainer"],
-    [data-theme="light"] .stMarkdown {
-        color: #1F2937;
-    }
-    
-    /* Headers: darker for emphasis */
-    [data-theme="light"] h1, [data-theme="light"] h2, [data-theme="light"] h3 {
-        color: #111827;
-    }
-    
-    /* Metric cards: white background, subtle shadow */
-    [data-theme="light"] [data-testid="stMetricValue"] {
-        color: #111827;
-        font-size: 1.5rem;
-        font-weight: 600;
-    }
-    
-    [data-theme="light"] [data-testid="stMetricLabel"] {
-        color: #6B7280;
-        font-size: 0.875rem;
-    }
-    
-    /* Expanders: white with border */
-    [data-theme="light"] [data-testid="stExpander"] {
-        background-color: #FFFFFF;
-        border: 1px solid #E5E7EB;
-        border-radius: 0.5rem;
-    }
-    
-    /* DataFrames: clean white */
-    [data-theme="light"] .stDataFrame {
-        background-color: #FFFFFF;
-        border: 1px solid #E5E7EB;
-    }
-    
-    /* Buttons: refined fintech style */
-    [data-theme="light"] .stButton > button {
-        border: 1px solid #D1D5DB;
-        background-color: #FFFFFF;
-        color: #374151;
-    }
-    
-    [data-theme="light"] .stButton > button[kind="primary"] {
-        background-color: #00D9FF;
-        color: #FFFFFF;
-        border: none;
-        font-weight: 600;
-    }
-    
-    [data-theme="light"] .stButton > button:hover {
-        border-color: #9CA3AF;
-    }
-    
-    /* Input fields: clean borders */
-    [data-theme="light"] .stTextInput > div > div > input,
-    [data-theme="light"] .stNumberInput > div > div > input,
-    [data-theme="light"] .stSelectbox > div > div > div {
-        border-color: #D1D5DB;
-        background-color: #FFFFFF;
-    }
-    
-    /* Tabs: refined look */
-    [data-theme="light"] .stTabs [data-baseweb="tab-list"] {
-        background-color: #F3F4F6;
-        border-radius: 0.5rem;
-    }
-    
-    [data-theme="light"] .stTabs [data-baseweb="tab"] {
-        color: #6B7280;
-    }
-    
-    [data-theme="light"] .stTabs [aria-selected="true"] {
-        color: #111827;
-        background-color: #FFFFFF;
-    }
-    
-    /* Info/warning boxes: subtle backgrounds */
-    [data-theme="light"] .stAlert {
-        background-color: #F0F9FF;
-        border-left: 4px solid #3B82F6;
-        color: #1E3A8A;
-    }
-    
-    /* === DARK THEME: Preserve Trading Terminal Feel === */
-    
-    [data-theme="dark"] [data-testid="stExpander"] {
-        background-color: rgba(30, 32, 39, 0.5);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    [data-theme="dark"] [data-testid="stMetricValue"] {
-        font-size: 1.5rem;
-        font-weight: 600;
-    }
-    
-    /* === SHARED STYLES === */
-    
-    /* Compact spacing for KPI strip */
-    [data-testid="stHorizontalBlock"] {
-        gap: 0.5rem;
-    }
-    
-    /* Chart containers: subtle borders */
-    [data-testid="stPlotlyChart"] {
-        border-radius: 0.5rem;
-    }
-    
-    /* Scrollbar styling for both themes */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    
-    [data-theme="light"] ::-webkit-scrollbar-track {
-        background: #F3F4F6;
-    }
-    
-    [data-theme="light"] ::-webkit-scrollbar-thumb {
-        background: #D1D5DB;
-        border-radius: 4px;
-    }
-    
-    [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
-        background: #9CA3AF;
-    }
-    
-    [data-theme="dark"] ::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.05);
-    }
-    
-    [data-theme="dark"] ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 4px;
-    }
-    
-    [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.3);
-    }
-</style>
-""", unsafe_allow_html=True)
 
 
 def plot_equity_curve(
@@ -198,14 +39,14 @@ def plot_equity_curve(
     event_markers: Optional[pd.DataFrame] = None,
     earnings_markers: Optional[pd.DataFrame] = None,
 ) -> go.Figure:
-    """Create equity curve chart with theme-adaptive styling."""
+    """Create equity curve chart with optional buy-and-hold benchmark and event markers."""
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=equity_df.index,
         y=equity_df["Equity"],
         mode="lines",
         name="策略權益 / Strategy Equity",
-        line=dict(color="#00D9FF", width=2.5),
+        line=dict(color="#2E86DE", width=2),
     ))
     
     if buy_hold_df is not None and not buy_hold_df.empty:
@@ -214,8 +55,7 @@ def plot_equity_curve(
             y=buy_hold_df["BuyHoldEquity"],
             mode="lines",
             name="買入持有 / Buy & Hold",
-            line=dict(color="#6B7280", width=1.5, dash="dot"),
-            opacity=0.7,
+            line=dict(color="#95A5A6", width=2, dash="dash"),
         ))
     
     # Normalize equity index to naive days for marker alignment (handles tz-aware yfinance data)
@@ -225,11 +65,11 @@ def plot_equity_curve(
     if event_markers is not None and not event_markers.empty:
         # Group by event type for color coding
         event_colors = {
-            "CPI": "#F59E0B",
-            "NFP": "#8B5CF6",
-            "FOMC": "#EC4899",
-            "Unemployment": "#3B82F6",
-            "GDP": "#10B981",
+            "CPI": "#E74C3C",
+            "NFP": "#F39C12",
+            "FOMC": "#9B59B6",
+            "Unemployment": "#3498DB",
+            "GDP": "#1ABC9C",
         }
         
         for event_type in event_markers["Type"].unique():
@@ -323,45 +163,24 @@ def plot_equity_curve(
                 ))
     
     fig.update_layout(
-        title=dict(text="權益曲線 / Equity Curve", font=dict(size=16, weight=600)),
+        title="權益曲線 / Equity Curve",
         xaxis_title="日期 / Date",
         yaxis_title="權益 / Equity ($)",
         hovermode="x unified",
-        template="plotly",  # Neutral template that adapts to both themes
-        plot_bgcolor="rgba(0,0,0,0)",  # Transparent to inherit theme
-        paper_bgcolor="rgba(0,0,0,0)",  # Transparent to inherit theme
-        font=dict(
-            family="sans-serif",
-            size=12,
-            color="gray"  # Will adapt to theme
-        ),
-        xaxis=dict(
-            showgrid=True,
-            gridwidth=1,
-            gridcolor="rgba(128,128,128,0.15)",  # Very subtle for both themes
-            zeroline=False,
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridwidth=1,
-            gridcolor="rgba(128,128,128,0.15)",  # Very subtle for both themes
-            zeroline=False,
-        ),
+        template="plotly_white",
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=1.02,
             xanchor="right",
-            x=1,
-            bgcolor="rgba(0,0,0,0)",  # Transparent
+            x=1
         ),
-        margin=dict(l=50, r=20, t=60, b=50),
     )
     return fig
 
 
 def plot_drawdown(equity_df: pd.DataFrame) -> go.Figure:
-    """Create drawdown chart with theme-adaptive styling."""
+    """Create drawdown chart."""
     equity = equity_df["Equity"]
     running_max = equity.expanding().max()
     drawdown = (equity - running_max) / running_max * 100
@@ -373,56 +192,76 @@ def plot_drawdown(equity_df: pd.DataFrame) -> go.Figure:
         mode="lines",
         name="回撤",
         fill="tozeroy",
-        line=dict(color="#EF4444", width=2),
-        fillcolor="rgba(239, 68, 68, 0.15)",  # Lighter fill for both themes
+        line=dict(color="#EA2027", width=2),
     ))
     fig.update_layout(
-        title=dict(text="回撤圖 / Drawdown", font=dict(size=16, weight=600)),
+        title="回撤圖 / Drawdown",
         xaxis_title="日期 / Date",
         yaxis_title="回撤 / Drawdown (%)",
         hovermode="x unified",
-        template="plotly",  # Neutral template that adapts to both themes
-        plot_bgcolor="rgba(0,0,0,0)",  # Transparent to inherit theme
-        paper_bgcolor="rgba(0,0,0,0)",  # Transparent to inherit theme
-        font=dict(
-            family="sans-serif",
-            size=12,
-            color="gray"  # Will adapt to theme
-        ),
-        xaxis=dict(
-            showgrid=True,
-            gridwidth=1,
-            gridcolor="rgba(128,128,128,0.15)",  # Very subtle for both themes
-            zeroline=False,
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridwidth=1,
-            gridcolor="rgba(128,128,128,0.15)",  # Very subtle for both themes
-            zeroline=False,
-        ),
-        margin=dict(l=50, r=20, t=60, b=50),
+        template="plotly_white",
     )
     return fig
 
 
 def main():
-    st.title("演算法交易回測系統")
-    st.caption("Algorithmic Trading Backtesting System")
+    # Initialize theme in session state (default to dark)
+    if "theme" not in st.session_state:
+        st.session_state.theme = "dark"
+    
+    # Inject JavaScript to set the data-theme attribute
+    st.markdown(f"""
+    <script>
+        // Set theme on page load
+        const theme = "{st.session_state.theme}";
+        const stApp = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+        if (stApp) {{
+            stApp.setAttribute('data-theme', theme);
+        }}
+        const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+        if (sidebar) {{
+            sidebar.setAttribute('data-theme', theme);
+        }}
+    </script>
+    """, unsafe_allow_html=True)
+    
+    st.title("📈 演算法交易回測系統")
+    st.markdown("**Algorithmic Trading Backtesting System**")
+    st.markdown("---")
     
     with st.sidebar:
-        st.header("設定面板 / Settings")
+        # Theme toggle at the top of sidebar (mobile-friendly)
+        st.markdown("### 🎨 主題 / Theme")
+        
+        # Theme selector
+        theme_option = st.radio(
+            "選擇主題 / Select Theme",
+            options=["dark", "light"],
+            format_func=lambda x: "深色 / Dark" if x == "dark" else "淺色 / Light",
+            index=0 if st.session_state.theme == "dark" else 1,
+            horizontal=True,
+            label_visibility="collapsed",
+            help="切換深色/淺色主題 / Switch between dark and light themes"
+        )
+        
+        # Update session state if changed
+        if theme_option != st.session_state.theme:
+            st.session_state.theme = theme_option
+            st.rerun()
+        
+        st.markdown("---")
+        st.header("⚙️ 回測設定 / Settings")
         
         strategy_type = st.selectbox(
             "策略 / Strategy",
             ["SMA Crossover", "RSI Mean Reversion"],
+            help="選擇交易策略 / Select trading strategy"
         )
         
-        st.subheader("數據來源 / Data Source")
+        st.subheader("📊 數據來源 / Data Source")
         data_source = st.radio(
-            "類型 / Type",
+            "數據類型 / Data Type",
             ["Yahoo Finance", "範例數據 / Sample CSV", "上傳 CSV / Upload CSV"],
-            label_visibility="collapsed",
         )
         
         symbol = None
@@ -472,7 +311,7 @@ def main():
             # Show description if available
             description = get_ticker_description(symbol)
             if description:
-                st.caption(description)
+                st.caption(f"📊 {description}")
             
             col1, col2 = st.columns(2)
             with col1:
@@ -488,18 +327,21 @@ def main():
         
         elif data_source == "範例數據 / Sample CSV":
             data_path = "data/sample/SPY_sample.csv"
-            st.info(
+            st.warning(
                 "⚠️ 範例數據僅涵蓋 2020-01-02 至 2020-06-01（約 104 個交易日，COVID-19 熊市期間）。"
                 "此期間不足以充分測試 SMA 50/200 策略（需要 200+ 個交易日）。"
+                "\n\n⚠️ Sample data covers only 2020-01-02 to 2020-06-01 (~104 bars, COVID-19 bear market). "
+                "Insufficient for SMA 50/200 strategy (needs 200+ bars)."
             )
         
         else:  # Upload CSV
             uploaded_file = st.file_uploader(
-                "上傳 OHLCV CSV 文件 / Upload OHLCV CSV",
+                "上傳 OHLCV CSV 文件",
                 type=["csv"],
+                help="需包含 Date, Open, High, Low, Close, Volume"
             )
         
-        st.subheader("資金設定 / Capital")
+        st.subheader("💰 資金設定 / Capital")
         initial_capital = st.number_input(
             "初始資金 / Initial Capital ($)",
             min_value=1000,
@@ -534,7 +376,7 @@ def main():
             step=5,
         ) / 100
         
-        st.subheader("策略參數 / Strategy Parameters")
+        st.subheader("🎯 策略參數 / Strategy Parameters")
         
         if strategy_type == "SMA Crossover":
             fast_period = st.number_input(
@@ -574,14 +416,15 @@ def main():
                 step=5,
             )
         
-        with st.expander("研究層 / Research Layers", expanded=False):
-            st.caption("L1 研究層：顯示與對齊 / L1 Research: Display & Alignment")
-            
-            st.markdown("**經濟日曆 / Economic Calendar**")
-            show_calendar = st.checkbox(
-                "顯示經濟公佈日 / Show Economic Releases",
-                value=True,
-            )
+        st.markdown("---")
+        st.subheader("📅 經濟日曆 / Economic Calendar")
+        st.caption("L1 研究層：顯示與對齊 / L1 Research: Display & Alignment")
+        
+        show_calendar = st.checkbox(
+            "顯示經濟公佈日 / Show Economic Releases",
+            value=True,
+            help="在圖表上標記重要經濟數據發布日期 / Mark major economic data release dates on chart"
+        )
         
         calendar_event_types = []
         calendar_filter_enabled = False
@@ -597,14 +440,16 @@ def main():
                     "事件類型 / Event Types",
                     options=available_types,
                     default=available_types,
+                    help="選擇要顯示的經濟事件類型 / Select economic event types to display"
                 )
                 
-                st.markdown("**研究過濾（可選）/ Research Filter**")
-                st.caption("此過濾僅用於研究對比 / For research comparison only")
+                st.markdown("**⚠️ 研究過濾（可選）/ Research Filter (Optional)**")
+                st.caption("此過濾僅用於研究對比，不會修改主回測結果 / For research comparison only, does not modify main backtest results")
                 
                 calendar_filter_enabled = st.checkbox(
-                    "啟用避開公佈日過濾 / Enable Avoidance Filter",
+                    "啟用避開公佈日過濾 / Enable Release Date Avoidance Filter",
                     value=False,
+                    help="過濾在經濟數據發布前後±N天進場的交易（僅研究用途）/ Filter trades entered ±N days around releases (research only)"
                 )
                 
                 if calendar_filter_enabled:
@@ -625,37 +470,45 @@ def main():
                             value=0,
                             step=1,
                         )
-            
-            st.markdown("---")
-            st.markdown("**新聞研究 / News Research**")
-            show_news = st.checkbox(
-                "顯示新聞（研究）/ Show News",
-                value=False,
-            )
-            
-            if show_news:
-                st.caption("⚠️ 研究用途、非完整歷史 / For research only")
-            
-            st.markdown("---")
-            st.markdown("**財報時間線 / Earnings Timeline**")
-            show_earnings = st.checkbox(
-                "顯示財報（研究）/ Show Earnings",
-                value=False,
-            )
+        
+        st.markdown("---")
+        st.subheader("📰 新聞研究 / News Research")
+        st.caption("L1 研究層：顯示與對齊 / L1 Research: Display & Alignment")
+        
+        show_news = st.checkbox(
+            "顯示新聞（研究）/ Show News (Research)",
+            value=False,
+            help="顯示回測期間的新聞標題（僅供研究參考，不影響回測結果）/ Display news headlines during backtest period (research only, does not affect backtest results)"
+        )
+        
+        if show_news:
+            st.caption("⚠️ 研究用途、非完整歷史 / For research only, not comprehensive historical coverage")
+        
+        st.markdown("---")
+        st.subheader("📊 財報／商蹤時間線 / Earnings Timeline")
+        st.caption("L1 研究層：顯示與對齊 / L1 Research: Display & Alignment")
+        
+        show_earnings = st.checkbox(
+            "顯示財報／商蹤（研究）/ Show Earnings/Business Events (Research)",
+            value=False,
+            help="顯示回測期間的財報及重要企業事件（僅供研究參考，不影響回測結果）/ Display earnings and major business events during backtest period (research only, does not affect backtest results)"
+        )
         
         earnings_filter_enabled = False
         earnings_filter_days_before = 0
         earnings_filter_days_after = 0
         
         if show_earnings:
-            st.caption("單一股票顯示財報日期 / Single stocks show earnings dates")
+            st.caption("**單一股票**：顯示財報日期 / **Single stocks**: Show earnings dates")
+            st.caption("**指數／ETF**：優雅降級（樣本數據）/ **Index/ETF**: Graceful degradation (sample data)")
             
-            st.markdown("**研究過濾（可選）/ Research Filter**")
-            st.caption("此過濾僅用於研究對比 / For research comparison only")
+            st.markdown("**⚠️ 研究過濾（可選）/ Research Filter (Optional)**")
+            st.caption("此過濾僅用於研究對比，不會修改主回測結果 / For research comparison only, does not modify main backtest results")
             
             earnings_filter_enabled = st.checkbox(
-                "啟用避開財報日過濾 / Enable Avoidance Filter",
+                "啟用避開財報日過濾 / Enable Earnings Date Avoidance Filter",
                 value=False,
+                help="過濾在財報發布前後±N天進場的交易（僅研究用途）/ Filter trades entered ±N days around earnings (research only)"
             )
             
             if earnings_filter_enabled:
@@ -679,7 +532,8 @@ def main():
                         key="earnings_after"
                     )
         
-        run_backtest = st.button("運行回測 / Run Backtest", type="primary", use_container_width=True)
+        st.markdown("---")
+        run_backtest = st.button("🚀 運行回測 / Run Backtest", use_container_width=True)
     
     if run_backtest:
         try:
@@ -795,33 +649,36 @@ def main():
             # Display calendar status if enabled
             if show_calendar:
                 if calendar_loaded and calendar_events is not None and not calendar_events.empty:
-                    st.caption(f"經濟事件標記：{len(calendar_events)} 個 / Economic events: {len(calendar_events)}")
+                    st.info(f"📅 已載入 {len(calendar_events)} 個經濟事件標記 / Loaded {len(calendar_events)} economic event markers")
                 elif show_calendar:
-                    st.caption("⚠️ 經濟日曆數據未載入 / Economic calendar data not loaded")
+                    st.caption("⚠️ 經濟日曆數據未載入（優雅降級）/ Economic calendar data not loaded (graceful degradation)")
             
             # Display news status if enabled
             if show_news:
                 if news_loaded and news_items is not None and not news_items.empty:
-                    source_label = "示範 CSV" if news_source == "sample_csv" else "yfinance"
-                    st.caption(f"新聞：{len(news_items)} 則（來源：{source_label}）/ News: {len(news_items)} items (source: {source_label})")
+                    source_label = "示範 CSV / Sample CSV" if news_source == "sample_csv" else "yfinance"
+                    st.info(f"📰 已載入 {len(news_items)} 則新聞（來源：{source_label}）/ Loaded {len(news_items)} news items (source: {source_label})")
                 else:
-                    st.caption("⚠️ 新聞數據未載入 / News data not loaded")
+                    st.caption("⚠️ 新聞數據未載入（優雅降級；回測結果不受影響）/ News data not loaded (graceful degradation; backtest results unaffected)")
             
             # Display earnings status if enabled
             if show_earnings:
                 if earnings_loaded and earnings_events is not None and not earnings_events.empty:
                     if earnings_source == "sample_csv":
-                        source_label = "示範 CSV"
+                        source_label = "示範 CSV / Sample CSV"
                     elif earnings_source == "yfinance":
                         source_label = "yfinance"
+                    elif earnings_source == "index_not_supported":
+                        source_label = "指數不支援 / Index not supported"
                     else:
                         source_label = "無 / None"
-                    st.caption(f"財報事件：{len(earnings_events)} 個（來源：{source_label}）/ Earnings: {len(earnings_events)} events (source: {source_label})")
+                    st.info(f"📊 已載入 {len(earnings_events)} 個財報事件（來源：{source_label}）/ Loaded {len(earnings_events)} earnings events (source: {source_label})")
+                elif earnings_source == "index_not_supported":
+                    st.caption("ℹ️ 指數／ETF 符號：完整成分股財報日曆未提供（顯示樣本數據）/ Index/ETF symbol: Full constituent earnings calendar not provided (showing sample data)")
                 else:
-                    st.caption("⚠️ 財報數據未載入 / Earnings data not loaded")
+                    st.caption("⚠️ 財報數據未載入（優雅降級；回測結果不受影響）/ Earnings data not loaded (graceful degradation; backtest results unaffected)")
             
-            # KPI Metric Strip at top
-            st.markdown("### 績效摘要 / Performance Summary")
+            st.markdown("## 📊 績效指標 / Performance Metrics")
             
             def format_metric(value, fmt=".2f", suffix=""):
                 """Format metric safely, handling NaN/inf values."""
@@ -829,93 +686,81 @@ def main():
                     return "N/A"
                 return f"{value:{fmt}}{suffix}"
             
-            def format_pct_with_color(value, inverse=False):
-                """Format percentage with color coding."""
-                if pd.isna(value) or not np.isfinite(value):
-                    return "N/A", None
-                color = "inverse" if inverse else "normal"
-                sign = "+" if value > 0 else ""
-                return f"{sign}{value:.2f}%", color
-            
-            # Top row: Key metrics
-            col1, col2, col3, col4, col5 = st.columns(5)
+            col1, col2, col3, col4 = st.columns(4)
             with col1:
-                total_ret = metrics.get('total_return_pct', float('nan'))
                 st.metric(
                     "總回報 / Total Return",
-                    format_metric(total_ret, suffix="%"),
+                    format_metric(metrics.get('total_return_pct', float('nan')), suffix="%"),
                 )
             with col2:
-                cagr = metrics.get('cagr_pct', float('nan'))
                 st.metric(
                     "年化報酬 / CAGR",
-                    format_metric(cagr, suffix="%"),
+                    format_metric(metrics.get('cagr_pct', float('nan')), suffix="%"),
                 )
             with col3:
-                max_dd = metrics.get('max_drawdown_pct', float('nan'))
                 st.metric(
                     "最大回撤 / Max Drawdown",
-                    format_metric(max_dd, suffix="%"),
+                    format_metric(metrics.get('max_drawdown_pct', float('nan')), suffix="%"),
                 )
             with col4:
-                sharpe = metrics.get('sharpe_ratio', float('nan'))
                 st.metric(
                     "夏普比率 / Sharpe",
-                    format_metric(sharpe),
-                )
-            with col5:
-                win_rate = metrics.get('win_rate_pct', float('nan'))
-                st.metric(
-                    "勝率 / Win Rate",
-                    format_metric(win_rate, fmt=".1f", suffix="%"),
+                    format_metric(metrics.get('sharpe_ratio', float('nan'))),
                 )
             
-            # Second row: Capital and trade stats
-            col6, col7, col8, col9, col10 = st.columns(5)
-            with col6:
+            col5, col6, col7, col8 = st.columns(4)
+            with col5:
                 st.metric(
                     "初始資金 / Initial",
                     f"${metrics.get('initial_capital', 0):,.0f}",
                 )
-            with col7:
+            with col6:
                 final_eq = metrics.get('final_equity', float('nan'))
                 final_eq_str = "N/A" if pd.isna(final_eq) or not np.isfinite(final_eq) else f"${final_eq:,.0f}"
                 st.metric(
                     "最終權益 / Final",
                     final_eq_str,
                 )
-            with col8:
-                st.metric(
-                    "買入持有回報 / Buy & Hold",
-                    f"{metrics['buy_hold_return_pct']:.2f}%",
-                )
-            with col9:
+            with col7:
                 st.metric(
                     "交易次數 / Trades",
                     f"{metrics.get('trade_count', 0)}",
                 )
-            with col10:
-                bh_final = metrics.get('buy_hold_final', float('nan'))
-                bh_str = "N/A" if pd.isna(bh_final) or not np.isfinite(bh_final) else f"${bh_final:,.0f}"
+            with col8:
                 st.metric(
-                    "買入持有最終 / B&H Final",
-                    bh_str,
+                    "勝率 / Win Rate",
+                    format_metric(metrics.get('win_rate_pct', float('nan')), fmt=".1f", suffix="%"),
                 )
             
-            # Educational note
-            with st.expander("教育性說明 / Educational Note", expanded=False):
-                st.info(
-                    "策略回報為正不代表策略有效——需要比較「買入持有」基準。"
-                    "這些策略僅供教育和研究使用，不構成投資建議。"
-                    "過去績效不代表未來表現。"
-                    "\n\n"
-                    "A positive strategy return does not mean the strategy is effective—you must compare against "
-                    "the buy-and-hold benchmark. These strategies are for educational and research purposes only "
-                    "and do not constitute investment advice. Past performance does not guarantee future results."
+            # Buy-and-hold benchmark comparison
+            st.markdown("### 📉 買入持有基準 / Buy & Hold Benchmark")
+            col9, col10 = st.columns(2)
+            with col9:
+                st.metric(
+                    "買入持有最終權益 / Buy & Hold Final",
+                    f"${metrics['buy_hold_final']:,.0f}",
+                )
+            with col10:
+                st.metric(
+                    "買入持有回報 / Buy & Hold Return",
+                    f"{metrics['buy_hold_return_pct']:.2f}%",
                 )
             
-            # Charts section
-            st.markdown("### 圖表 / Charts")
+            # Educational note in Traditional Chinese
+            st.info(
+                "💡 **教育性說明 / Educational Note**\n\n"
+                "策略回報為正不代表策略有效——需要比較「買入持有」基準。"
+                "這些策略僅供教育和研究使用，不構成投資建議。"
+                "過去績效不代表未來表現。"
+                "\n\n"
+                "A positive strategy return does not mean the strategy is effective—you must compare against "
+                "the buy-and-hold benchmark. These strategies are for educational and research purposes only "
+                "and do not constitute investment advice. Past performance does not guarantee future results."
+            )
+            
+            st.markdown("---")
+            
+            st.markdown("## 📈 圖表 / Charts")
             
             tab1, tab2 = st.tabs(["權益曲線 / Equity Curve", "回撤圖 / Drawdown"])
             
@@ -931,21 +776,24 @@ def main():
             with tab2:
                 st.plotly_chart(plot_drawdown(equity_curve), use_container_width=True)
             
-            # Details sections in expanders
+            st.markdown("---")
+            
             # Economic events table (L1 display)
             if show_calendar and calendar_loaded and calendar_events is not None and not calendar_events.empty:
-                with st.expander("經濟事件列表 / Economic Events List", expanded=False):
+                with st.expander("📅 經濟事件列表 / Economic Events List", expanded=False):
                     st.dataframe(
                         calendar_events.style.format({"Date": lambda x: x.strftime("%Y-%m-%d")}),
                         use_container_width=True,
                     )
                     st.caption(
-                        "時區：美東時間｜資料來源：靜態 CSV / Timezone: US Eastern | Data source: Static CSV"
+                        "🕐 時區：美東時間（US Eastern Time）｜"
+                        "資料來源：靜態 CSV（可定期更新）｜"
+                        "Data source: Static CSV (periodic updates) | Timezone: US Eastern"
                     )
             
             # News panel (L1 display)
             if show_news and news_loaded and news_items is not None and not news_items.empty:
-                with st.expander("新聞列表 / News Headlines", expanded=False):
+                with st.expander("📰 新聞列表 / News Headlines", expanded=False):
                     # Format news display
                     news_display = news_items[["Date", "Headline", "Sentiment"]].copy()
                     news_display["Date"] = news_display["Date"].dt.strftime("%Y-%m-%d")
@@ -966,12 +814,13 @@ def main():
                         hide_index=True,
                     )
                     st.caption(
-                        f"⚠️ 研究用途、非完整歷史（來源：{news_source}）/ For research only (source: {news_source})"
+                        f"⚠️ 研究用途、非完整歷史（來源：{news_source}）/ For research only, not comprehensive (source: {news_source})\n\n"
+                        f"💡 情緒標籤為簡單啟發式分類，僅供參考 / Sentiment labels are simple heuristic-based, for reference only"
                     )
             
             # Earnings events table (L1 display)
             if show_earnings and earnings_loaded and earnings_events is not None and not earnings_events.empty:
-                with st.expander("財報事件列表 / Earnings Events List", expanded=False):
+                with st.expander("📊 財報事件列表 / Earnings Events List", expanded=False):
                     earnings_display = earnings_events[["Date", "Event", "Symbol"]].copy()
                     earnings_display["Date"] = earnings_display["Date"].dt.strftime("%Y-%m-%d")
                     
@@ -981,11 +830,12 @@ def main():
                         hide_index=True,
                     )
                     st.caption(
-                        f"⚠️ 研究用途、非完整歷史（來源：{earnings_source}）/ For research only (source: {earnings_source})"
+                        f"⚠️ 研究用途、非完整歷史（來源：{earnings_source}）/ For research only, not comprehensive (source: {earnings_source})\n\n"
+                        f"💡 單一股票顯示財報日期；指數／ETF 為樣本數據 / Single stocks show earnings dates; index/ETF shows sample data"
                     )
                     
                     # CSV export option
-                    if st.button("匯出財報事件 CSV / Export Earnings CSV"):
+                    if st.button("📥 匯出財報事件 CSV / Export Earnings Events CSV"):
                         csv = earnings_events.to_csv(index=False)
                         st.download_button(
                             label="下載 CSV / Download CSV",
@@ -996,12 +846,15 @@ def main():
             
             # Research filter comparison (opt-in only, shows side-by-side)
             if show_calendar and calendar_loaded and calendar_filter_enabled and calendar_events is not None:
-                with st.expander("研究過濾對比 / Research Filter Comparison", expanded=False):
-                    st.warning(
-                        "⚠️ **研究過濾警告 / Research Filter Notice**\n\n"
-                        "此過濾僅用於研究目的，比較避開經濟數據發布日的績效差異。主回測結果保持不變。\n\n"
-                        "This filter is for research purposes only. Main backtest results remain unchanged."
-                    )
+                st.markdown("---")
+                st.markdown("## 🔬 研究過濾對比 / Research Filter Comparison")
+                st.warning(
+                    "⚠️ **研究過濾警告 / Research Filter Notice**\n\n"
+                    "此過濾僅用於研究目的，比較避開經濟數據發布日的績效差異。"
+                    "**主回測結果（上方）保持不變**，此處顯示過濾後的次要結果供對比參考。\n\n"
+                    "This filter is for research purposes only, comparing performance when avoiding economic release dates. "
+                    "**Main backtest results (above) remain unchanged**. Filtered results shown here for comparison."
+                )
                 
                 # Create exclusion window
                 economic_calendar_obj = EconomicCalendar()
@@ -1032,17 +885,17 @@ def main():
                     equity_curve,
                 )
                 
-                st.markdown("**對比摘要 / Comparison Summary**")
+                st.markdown("### 對比摘要 / Comparison Summary")
                 col_left, col_right = st.columns(2)
                 
                 with col_left:
-                    st.markdown("**完整回測 / Full Backtest**")
+                    st.markdown("**🔵 完整回測 / Full Backtest**")
                     st.metric("交易次數 / Trades", metrics.get('trade_count', 0))
                     st.metric("總回報 / Return", f"{metrics.get('total_return_pct', 0):.2f}%")
                     st.metric("勝率 / Win Rate", f"{metrics.get('win_rate_pct', 0):.1f}%")
                 
                 with col_right:
-                    st.markdown(f"**過濾後（避開 ±{calendar_filter_days_before}/{calendar_filter_days_after} 日）/ Filtered**")
+                    st.markdown(f"**🔬 過濾後（避開 ±{calendar_filter_days_before}/{calendar_filter_days_after} 日）/ Filtered**")
                     excluded_count = metrics.get('trade_count', 0) - filtered_metrics['trade_count']
                     st.metric(
                         "交易次數 / Trades",
@@ -1063,19 +916,25 @@ def main():
                         delta=f"{win_rate_delta:+.1f}%",
                     )
                 
-                st.caption(
-                    "對比完整回測與過濾後結果，可研究經濟數據發布對策略績效的影響。\n\n"
-                    "Compare full vs. filtered results to research the impact of economic releases."
+                st.info(
+                    "💡 **解讀 / Interpretation**\n\n"
+                    "對比完整回測與過濾後結果，可研究經濟數據發布對策略績效的影響。"
+                    "若過濾後績效顯著改善，可考慮將「避開公佈日」納入 L2 事件驅動策略（需獨立開發與測試）。\n\n"
+                    "Comparing full vs. filtered results helps research the impact of economic releases on strategy performance. "
+                    "If filtered performance is significantly better, consider developing an L2 event-driven strategy (requires separate development and testing)."
                 )
             
             # Earnings research filter comparison (opt-in only)
             if show_earnings and earnings_loaded and earnings_filter_enabled and earnings_events is not None:
-                with st.expander("財報過濾對比 / Earnings Filter Comparison", expanded=False):
-                    st.warning(
-                        "⚠️ **研究過濾警告 / Research Filter Notice**\n\n"
-                        "此過濾僅用於研究目的，比較避開財報發布日的績效差異。主回測結果保持不變。\n\n"
-                        "This filter is for research purposes only. Main backtest results remain unchanged."
-                    )
+                st.markdown("---")
+                st.markdown("## 🔬 財報過濾對比 / Earnings Filter Comparison")
+                st.warning(
+                    "⚠️ **研究過濾警告 / Research Filter Notice**\n\n"
+                    "此過濾僅用於研究目的，比較避開財報發布日的績效差異。"
+                    "**主回測結果（上方）保持不變**，此處顯示過濾後的次要結果供對比參考。\n\n"
+                    "This filter is for research purposes only, comparing performance when avoiding earnings dates. "
+                    "**Main backtest results (above) remain unchanged**. Filtered results shown here for comparison."
+                )
                 
                 # Create exclusion window
                 earnings_calendar_obj = EarningsCalendar()
@@ -1107,17 +966,17 @@ def main():
                     equity_curve,
                 )
                 
-                st.markdown("**對比摘要 / Comparison Summary**")
+                st.markdown("### 對比摘要 / Comparison Summary")
                 col_left, col_right = st.columns(2)
                 
                 with col_left:
-                    st.markdown("**完整回測 / Full Backtest**")
+                    st.markdown("**🔵 完整回測 / Full Backtest**")
                     st.metric("交易次數 / Trades", metrics.get('trade_count', 0))
                     st.metric("總回報 / Return", f"{metrics.get('total_return_pct', 0):.2f}%")
                     st.metric("勝率 / Win Rate", f"{metrics.get('win_rate_pct', 0):.1f}%")
                 
                 with col_right:
-                    st.markdown(f"**過濾後（避開財報 ±{earnings_filter_days_before}/{earnings_filter_days_after} 日）/ Filtered**")
+                    st.markdown(f"**🔬 過濾後（避開財報 ±{earnings_filter_days_before}/{earnings_filter_days_after} 日）/ Filtered**")
                     excluded_count = metrics.get('trade_count', 0) - filtered_earnings_metrics['trade_count']
                     st.metric(
                         "交易次數 / Trades",
@@ -1138,13 +997,17 @@ def main():
                         delta=f"{win_rate_delta:+.1f}%",
                     )
                 
-                st.caption(
-                    "對比完整回測與過濾後結果，可研究財報發布對策略績效的影響。\n\n"
-                    "Compare full vs. filtered results to research the impact of earnings releases."
+                st.info(
+                    "💡 **解讀 / Interpretation**\n\n"
+                    "對比完整回測與過濾後結果，可研究財報發布對策略績效的影響。"
+                    "若過濾後績效顯著改善，可考慮將「避開財報日」納入 L2 事件驅動策略（需獨立開發與測試）。\n\n"
+                    "Comparing full vs. filtered results helps research the impact of earnings releases on strategy performance. "
+                    "If filtered performance is significantly better, consider developing an L2 event-driven strategy (requires separate development and testing)."
                 )
             
-            # Trade details
-            st.markdown("### 交易明細 / Trade Details")
+            st.markdown("---")
+            
+            st.markdown("## 📋 交易明細 / Trade Details")
             
             if engine.trades:
                 trades_df = engine.get_trades_df()
@@ -1160,7 +1023,7 @@ def main():
                 
                 csv = trades_df.to_csv(index=False).encode('utf-8')
                 st.download_button(
-                    label="下載交易記錄 / Download Trades",
+                    label="📥 下載交易記錄 / Download Trades",
                     data=csv,
                     file_name=f"trades_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                     mime="text/csv",
@@ -1173,9 +1036,9 @@ def main():
             st.exception(e)
     
     else:
-        st.info("請在左側設定參數並點擊「運行回測」按鈕開始\n\nPlease configure parameters in the sidebar and click 'Run Backtest'")
+        st.info("👈 請在左側設定參數並點擊「運行回測」按鈕開始\n\n← Please configure parameters in the sidebar and click 'Run Backtest'")
         
-        st.markdown("### 快速開始 / Quick Start")
+        st.markdown("## 快速開始 / Quick Start")
         st.markdown("""
         **預設設定已可運行：**
         1. 數據來源：Yahoo Finance（SPY，2018-01-01 至今）
@@ -1186,6 +1049,16 @@ def main():
         1. Data source: Yahoo Finance (SPY, 2018-01-01 to today)
         2. Strategy: SMA Crossover (fast 20 / slow 50)
         3. Click 'Run Backtest' button
+        
+        ---
+        
+        **功能 / Features:**
+        - 📊 即時圖表顯示權益曲線和回撤
+        - 📈 完整績效指標（回報率、CAGR、夏普比率等）
+        - 📉 買入持有基準比較
+        - 💰 可自訂佣金、滑點和倉位大小
+        - 🔄 支援 Yahoo Finance 線上數據或上傳自己的 CSV
+        - 📥 下載交易明細
         """)
 
 
