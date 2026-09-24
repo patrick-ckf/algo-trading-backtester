@@ -33,93 +33,11 @@ st.set_page_config(
 )
 
 
-def apply_theme_css(theme: str):
-    """Apply custom CSS based on selected theme."""
-    if theme == "Dark":
-        css = """
-        <style>
-        /* Dark Trading Terminal Theme */
-        :root {
-            --bg-primary: #0E1117;
-            --bg-secondary: #1A1D24;
-            --text-primary: #FAFAFA;
-            --text-secondary: #B0B8C4;
-            --accent: #2E86DE;
-        }
-        .stApp {
-            background-color: #0E1117;
-            color: #FAFAFA;
-        }
-        .stMarkdown, .stText {
-            color: #FAFAFA;
-        }
-        section[data-testid="stSidebar"] {
-            background-color: #1A1D24;
-        }
-        section[data-testid="stSidebar"] .stMarkdown {
-            color: #FAFAFA;
-        }
-        .stMetric {
-            background-color: #1A1D24;
-            border: 1px solid #2E3A4A;
-            border-radius: 8px;
-            padding: 12px;
-        }
-        .stMetric label {
-            color: #B0B8C4 !important;
-        }
-        .stMetric [data-testid="stMetricValue"] {
-            color: #FAFAFA !important;
-        }
-        </style>
-        """
-    else:  # Light
-        css = """
-        <style>
-        /* Light Fintech Theme */
-        :root {
-            --bg-primary: #FFFFFF;
-            --bg-secondary: #F0F2F6;
-            --text-primary: #262730;
-            --text-secondary: #6C757D;
-            --accent: #2E86DE;
-        }
-        .stApp {
-            background-color: #FFFFFF;
-            color: #262730;
-        }
-        .stMarkdown, .stText {
-            color: #262730;
-        }
-        section[data-testid="stSidebar"] {
-            background-color: #F8F9FA;
-        }
-        section[data-testid="stSidebar"] .stMarkdown {
-            color: #262730;
-        }
-        .stMetric {
-            background-color: #F8F9FA;
-            border: 1px solid #DEE2E6;
-            border-radius: 8px;
-            padding: 12px;
-        }
-        .stMetric label {
-            color: #6C757D !important;
-        }
-        .stMetric [data-testid="stMetricValue"] {
-            color: #262730 !important;
-        }
-        </style>
-        """
-    st.markdown(css, unsafe_allow_html=True)
-
-
 def plot_equity_curve(
     equity_df: pd.DataFrame,
     buy_hold_df: Optional[pd.DataFrame] = None,
     event_markers: Optional[pd.DataFrame] = None,
     earnings_markers: Optional[pd.DataFrame] = None,
-    theme: str = "Dark",
 ) -> go.Figure:
     """Create equity curve chart with optional buy-and-hold benchmark and event markers."""
     fig = go.Figure()
@@ -244,13 +162,12 @@ def plot_equity_curve(
                     text=hover_texts,
                 ))
     
-    plotly_template = "plotly_dark" if theme == "Dark" else "plotly_white"
     fig.update_layout(
         title="權益曲線 / Equity Curve",
         xaxis_title="日期 / Date",
         yaxis_title="權益 / Equity ($)",
         hovermode="x unified",
-        template=plotly_template,
+        template="plotly_white",
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -262,7 +179,7 @@ def plot_equity_curve(
     return fig
 
 
-def plot_drawdown(equity_df: pd.DataFrame, theme: str = "Dark") -> go.Figure:
+def plot_drawdown(equity_df: pd.DataFrame) -> go.Figure:
     """Create drawdown chart."""
     equity = equity_df["Equity"]
     running_max = equity.expanding().max()
@@ -277,24 +194,36 @@ def plot_drawdown(equity_df: pd.DataFrame, theme: str = "Dark") -> go.Figure:
         fill="tozeroy",
         line=dict(color="#EA2027", width=2),
     ))
-    plotly_template = "plotly_dark" if theme == "Dark" else "plotly_white"
     fig.update_layout(
         title="回撤圖 / Drawdown",
         xaxis_title="日期 / Date",
         yaxis_title="回撤 / Drawdown (%)",
         hovermode="x unified",
-        template=plotly_template,
+        template="plotly_white",
     )
     return fig
 
 
 def main():
-    # Initialize theme in session state (default to Dark)
+    # Initialize theme in session state (default to dark)
     if "theme" not in st.session_state:
-        st.session_state.theme = "Dark"
+        st.session_state.theme = "dark"
     
-    # Apply theme CSS
-    apply_theme_css(st.session_state.theme)
+    # Inject JavaScript to set the data-theme attribute
+    st.markdown(f"""
+    <script>
+        // Set theme on page load
+        const theme = "{st.session_state.theme}";
+        const stApp = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+        if (stApp) {{
+            stApp.setAttribute('data-theme', theme);
+        }}
+        const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+        if (sidebar) {{
+            sidebar.setAttribute('data-theme', theme);
+        }}
+    </script>
+    """, unsafe_allow_html=True)
     
     st.title("📈 演算法交易回測系統")
     st.markdown("**Algorithmic Trading Backtesting System**")
@@ -303,10 +232,13 @@ def main():
     with st.sidebar:
         # Theme toggle at the top of sidebar (mobile-friendly)
         st.markdown("### 🎨 主題 / Theme")
+        
+        # Theme selector
         theme_option = st.radio(
             "選擇主題 / Select Theme",
-            options=["Dark", "Light"],
-            index=0 if st.session_state.theme == "Dark" else 1,
+            options=["dark", "light"],
+            format_func=lambda x: "深色 / Dark" if x == "dark" else "淺色 / Light",
+            index=0 if st.session_state.theme == "dark" else 1,
             horizontal=True,
             label_visibility="collapsed",
             help="切換深色/淺色主題 / Switch between dark and light themes"
@@ -837,12 +769,12 @@ def main():
                 chart_events = calendar_events if (show_calendar and calendar_loaded) else None
                 chart_earnings = earnings_events if (show_earnings and earnings_loaded) else None
                 st.plotly_chart(
-                    plot_equity_curve(equity_curve, buy_hold_curve, event_markers=chart_events, earnings_markers=chart_earnings, theme=st.session_state.theme),
+                    plot_equity_curve(equity_curve, buy_hold_curve, event_markers=chart_events, earnings_markers=chart_earnings),
                     use_container_width=True
                 )
             
             with tab2:
-                st.plotly_chart(plot_drawdown(equity_curve, theme=st.session_state.theme), use_container_width=True)
+                st.plotly_chart(plot_drawdown(equity_curve), use_container_width=True)
             
             st.markdown("---")
             

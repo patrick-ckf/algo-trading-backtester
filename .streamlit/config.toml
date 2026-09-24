@@ -7,9 +7,24 @@ enableXsrfProtection = true
 [browser]
 gatherUsageStats = false
 
+# Dual-theme configuration for trading dashboard
+# Dark theme: Trading terminal style (app default/preferred)
+# Light theme: Clean modern fintech aesthetic
+
 [theme]
-primaryColor = "#2E86DE"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F0F2F6"
-textColor = "#262730"
+# Default/preferred: dark trading terminal
+base = "dark"
+primaryColor = "#00D9FF"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#1E2027"
+textColor = "#FAFAFA"
 font = "sans serif"
+
+# Note: Streamlit's config.toml supports one custom theme at a time.
+# Light theme styling is handled via:
+# 1. Streamlit's built-in light theme (when user toggles Settings → Theme → Light)
+# 2. Custom CSS in streamlit_app.py that provides modern fintech look:
+#    - Soft gray surfaces (#F8F9FA background, #FFFFFF cards)
+#    - High-contrast text (#1F2937)
+#    - Clean borders (#E5E7EB)
+# 3. Theme-adaptive Plotly charts (transparent backgrounds, subtle grids)
