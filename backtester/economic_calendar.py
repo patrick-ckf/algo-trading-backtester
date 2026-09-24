@@ -11,6 +11,23 @@ import pandas as pd
 import numpy as np
 
 
+def _to_naive_day(value) -> pd.Timestamp:
+    """
+    Convert a timestamp-like value to timezone-naive midnight for safe comparisons.
+
+    Yahoo/yfinance daily bars on some environments are tz-aware (e.g. US/Eastern);
+    our calendar CSV parses as naive datetime64[us]. Comparing the two raises TypeError.
+    We keep the civil calendar date in the source timezone (or as-labeled if naive).
+    """
+    ts = pd.Timestamp(value)
+    if getattr(ts, "tz", None) is not None:
+        # Preserve the date as labeled in that timezone (do not shift via UTC).
+        ts = pd.Timestamp(ts.date())
+    else:
+        ts = ts.normalize()
+    return ts
+
+
 class EconomicCalendar:
     """
     Load and filter US economic release dates for research purposes.
@@ -54,6 +71,9 @@ class EconomicCalendar:
             
             if self.calendar_df.empty:
                 return False
+
+            # Normalize to naive calendar days for comparison with OHLCV indexes
+            self.calendar_df["Date"] = self.calendar_df["Date"].map(_to_naive_day)
             
             # Extract available event types
             if "Type" in self.calendar_df.columns:
@@ -95,8 +115,11 @@ class EconomicCalendar:
         if not self.is_loaded():
             return pd.DataFrame(columns=["Date", "Event", "Type", "Country"])
         
-        # Filter by date range
-        mask = (self.calendar_df["Date"] >= start_date) & (self.calendar_df["Date"] <= end_date)
+        start = _to_naive_day(start_date)
+        end = _to_naive_day(end_date)
+
+        # Filter by date range (both sides timezone-naive calendar days)
+        mask = (self.calendar_df["Date"] >= start) & (self.calendar_df["Date"] <= end)
         filtered = self.calendar_df[mask].copy()
         
         # Filter by event types if specified
@@ -152,9 +175,10 @@ class EconomicCalendar:
         
         excluded_dates = set()
         for event_date in event_dates:
+            base = _to_naive_day(event_date)
             # Add dates in window
             for offset in range(-days_before, days_after + 1):
-                excluded_dates.add(event_date + pd.Timedelta(days=offset))
+                excluded_dates.add(base + pd.Timedelta(days=offset))
         
         return pd.DatetimeIndex(sorted(excluded_dates))
     
@@ -180,9 +204,11 @@ class EconomicCalendar:
         if trades_df.empty or len(excluded_dates) == 0:
             return trades_df
         
-        # Normalize entry dates to date only (remove time component)
-        entry_dates = pd.to_datetime(trades_df[entry_column]).dt.normalize()
-        excluded_dates_normalized = pd.to_datetime(excluded_dates).normalize()
+        # Normalize entry dates to naive calendar days (handles tz-aware indexes)
+        entry_dates = pd.to_datetime(trades_df[entry_column]).map(_to_naive_day)
+        excluded_dates_normalized = pd.DatetimeIndex(
+            [_to_naive_day(d) for d in excluded_dates]
+        )
         
         # Keep trades whose entry date is NOT in exclusion window
         mask = ~entry_dates.isin(excluded_dates_normalized)

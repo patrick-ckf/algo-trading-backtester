@@ -420,3 +420,22 @@ class TestStreamlitIntegration:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+def test_filter_tz_aware_start_end_against_naive_calendar():
+    """Streamlit/yfinance may pass tz-aware index bounds; calendar CSV is naive."""
+    cal = EconomicCalendar()
+    assert cal.load()
+
+    start = pd.Timestamp("2018-01-02 00:00:00", tz="America/New_York")
+    end = pd.Timestamp("2018-03-31 00:00:00", tz="America/New_York")
+
+    filtered = cal.filter_by_date_range(start, end)
+    assert not filtered.empty
+    assert all(getattr(ts, "tz", None) is None for ts in filtered["Date"])
+
+    # datetime64[us] naive bounds must still work
+    start_naive = pd.Timestamp("2018-01-02").as_unit("us")
+    end_naive = pd.Timestamp("2018-03-31").as_unit("us")
+    filtered2 = cal.filter_by_date_range(start_naive, end_naive)
+    assert len(filtered2) == len(filtered)
