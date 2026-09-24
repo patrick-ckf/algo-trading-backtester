@@ -15,6 +15,13 @@
 
 後續會按階段加入指數快捷、經濟日曆、新聞與商蹤／財報等**研究層**。加功能前已鎖定產品邊界（回測只信 OHLCV；研究層預設只顯示、唔改訊號）：見 [docs/PHASE0-boundaries.md](docs/PHASE0-boundaries.md)。
 
+**已完成階段 / Completed Phases**：
+- ✅ **Phase 0**: 產品邊界與數據原則 / Product boundaries and data principles
+- ✅ **Phase 1**: 指數／ETF 快捷清單 / Index/ETF presets
+- ✅ **Phase 2**: 經濟日曆疊加層 / Economic calendar overlay ([docs](docs/PHASE2-economic-calendar.md))
+- ✅ **Phase 3**: 新聞研究面板 / News research panel ([docs](docs/PHASE3-news-panel.md))
+- ✅ **Phase 4**: 財報／商蹤時間線 / Earnings timeline ([docs](docs/PHASE4-earnings-timeline.md))
+
 ### 已完成階段
 
 - **Phase 0**：產品邊界與數據原則 → [docs/PHASE0-boundaries.md](docs/PHASE0-boundaries.md)

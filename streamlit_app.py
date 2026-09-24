@@ -18,6 +18,7 @@ from backtester.strategies.sma_crossover import SMACrossover
 from backtester.strategies.rsi_mean_reversion import RSIMeanReversion
 from backtester.economic_calendar import EconomicCalendar, calculate_research_metrics
 from backtester.news import NewsPanel
+from backtester.earnings_calendar import EarningsCalendar
 from backtester.ticker_presets import (
     get_grouped_ticker_options,
     is_separator,
@@ -36,6 +37,7 @@ def plot_equity_curve(
     equity_df: pd.DataFrame,
     buy_hold_df: Optional[pd.DataFrame] = None,
     event_markers: Optional[pd.DataFrame] = None,
+    earnings_markers: Optional[pd.DataFrame] = None,
 ) -> go.Figure:
     """Create equity curve chart with optional buy-and-hold benchmark and event markers."""
     fig = go.Figure()
@@ -98,6 +100,53 @@ def plot_equity_curve(
                         line=dict(width=1, color="white"),
                     ),
                     hovertemplate="<b>%{x}</b><br>" + f"{event_type}<br>" + "權益 / Equity: $%{y:,.0f}<extra></extra>",
+                ))
+    
+    # Add earnings event markers (L1 display layer - Phase 4)
+    if earnings_markers is not None and not earnings_markers.empty:
+        # Group by symbol for color coding
+        import hashlib
+        
+        for symbol in earnings_markers["Symbol"].unique():
+            symbol_events = earnings_markers[earnings_markers["Symbol"] == symbol]
+            
+            # Generate consistent color for symbol
+            color_hash = int(hashlib.md5(symbol.encode()).hexdigest()[:6], 16)
+            color = f"#{color_hash:06x}"
+            
+            # Get y-values at event dates for scatter plot
+            y_values = []
+            x_values = []
+            hover_texts = []
+            for _, row in symbol_events.iterrows():
+                event_date = row["Date"]
+                # Find closest equity value
+                if event_date in equity_df.index:
+                    y_values.append(equity_df.loc[event_date, "Equity"])
+                    x_values.append(event_date)
+                    hover_texts.append(f"<b>{event_date.strftime('%Y-%m-%d')}</b><br>{row['Event']}<br>權益: ${equity_df.loc[event_date, 'Equity']:,.0f}")
+                else:
+                    # Find nearest date
+                    nearest_idx = equity_df.index.get_indexer([event_date], method="nearest")[0]
+                    if 0 <= nearest_idx < len(equity_df):
+                        y_values.append(equity_df.iloc[nearest_idx]["Equity"])
+                        x_values.append(event_date)
+                        hover_texts.append(f"<b>{event_date.strftime('%Y-%m-%d')}</b><br>{row['Event']}<br>權益: ${equity_df.iloc[nearest_idx]['Equity']:,.0f}")
+            
+            if x_values and y_values:
+                fig.add_trace(go.Scatter(
+                    x=x_values,
+                    y=y_values,
+                    mode="markers",
+                    name=f"📊 {symbol} Earnings",
+                    marker=dict(
+                        size=10,
+                        color=color,
+                        symbol="square",
+                        line=dict(width=1, color="white"),
+                    ),
+                    hovertemplate="%{text}<extra></extra>",
+                    text=hover_texts,
                 ))
     
     fig.update_layout(
@@ -383,6 +432,54 @@ def main():
             st.caption("⚠️ 研究用途、非完整歷史 / For research only, not comprehensive historical coverage")
         
         st.markdown("---")
+        st.subheader("📊 財報／商蹤時間線 / Earnings Timeline")
+        st.caption("L1 研究層：顯示與對齊 / L1 Research: Display & Alignment")
+        
+        show_earnings = st.checkbox(
+            "顯示財報／商蹤（研究）/ Show Earnings/Business Events (Research)",
+            value=False,
+            help="顯示回測期間的財報及重要企業事件（僅供研究參考，不影響回測結果）/ Display earnings and major business events during backtest period (research only, does not affect backtest results)"
+        )
+        
+        earnings_filter_enabled = False
+        earnings_filter_days_before = 0
+        earnings_filter_days_after = 0
+        
+        if show_earnings:
+            st.caption("**單一股票**：顯示財報日期 / **Single stocks**: Show earnings dates")
+            st.caption("**指數／ETF**：優雅降級（樣本數據）/ **Index/ETF**: Graceful degradation (sample data)")
+            
+            st.markdown("**⚠️ 研究過濾（可選）/ Research Filter (Optional)**")
+            st.caption("此過濾僅用於研究對比，不會修改主回測結果 / For research comparison only, does not modify main backtest results")
+            
+            earnings_filter_enabled = st.checkbox(
+                "啟用避開財報日過濾 / Enable Earnings Date Avoidance Filter",
+                value=False,
+                help="過濾在財報發布前後±N天進場的交易（僅研究用途）/ Filter trades entered ±N days around earnings (research only)"
+            )
+            
+            if earnings_filter_enabled:
+                col_before, col_after = st.columns(2)
+                with col_before:
+                    earnings_filter_days_before = st.number_input(
+                        "避開前 N 日（財報）/ Days Before (Earnings)",
+                        min_value=0,
+                        max_value=5,
+                        value=1,
+                        step=1,
+                        key="earnings_before"
+                    )
+                with col_after:
+                    earnings_filter_days_after = st.number_input(
+                        "避開後 N 日（財報）/ Days After (Earnings)",
+                        min_value=0,
+                        max_value=5,
+                        value=0,
+                        step=1,
+                        key="earnings_after"
+                    )
+        
+        st.markdown("---")
         run_backtest = st.button("🚀 運行回測 / Run Backtest", use_container_width=True)
     
     if run_backtest:
@@ -478,6 +575,22 @@ def main():
                         symbol=symbol,
                     )
             
+            # Load earnings calendar if enabled (L1 layer - does not affect L0 backtest)
+            earnings_events = None
+            earnings_loaded = False
+            earnings_source = "none"
+            if show_earnings:
+                earnings_calendar = EarningsCalendar()
+                # Try to load earnings (prefer sample CSV, with yfinance fallback)
+                if earnings_calendar.load(symbol=symbol, start_date=data.index.min(), end_date=data.index.max(), prefer_yfinance=False):
+                    earnings_loaded = True
+                    earnings_source = earnings_calendar.get_data_source()
+                    earnings_events = earnings_calendar.filter_by_date_range(
+                        start_date=data.index.min(),
+                        end_date=data.index.max(),
+                        symbol=symbol if earnings_source != "sample_csv" else None,  # Sample CSV may have multiple symbols
+                    )
+            
             st.success("✅ 回測完成 / Backtest complete!")
             
             # Display calendar status if enabled
@@ -494,6 +607,23 @@ def main():
                     st.info(f"📰 已載入 {len(news_items)} 則新聞（來源：{source_label}）/ Loaded {len(news_items)} news items (source: {source_label})")
                 else:
                     st.caption("⚠️ 新聞數據未載入（優雅降級；回測結果不受影響）/ News data not loaded (graceful degradation; backtest results unaffected)")
+            
+            # Display earnings status if enabled
+            if show_earnings:
+                if earnings_loaded and earnings_events is not None and not earnings_events.empty:
+                    if earnings_source == "sample_csv":
+                        source_label = "示範 CSV / Sample CSV"
+                    elif earnings_source == "yfinance":
+                        source_label = "yfinance"
+                    elif earnings_source == "index_not_supported":
+                        source_label = "指數不支援 / Index not supported"
+                    else:
+                        source_label = "無 / None"
+                    st.info(f"📊 已載入 {len(earnings_events)} 個財報事件（來源：{source_label}）/ Loaded {len(earnings_events)} earnings events (source: {source_label})")
+                elif earnings_source == "index_not_supported":
+                    st.caption("ℹ️ 指數／ETF 符號：完整成分股財報日曆未提供（顯示樣本數據）/ Index/ETF symbol: Full constituent earnings calendar not provided (showing sample data)")
+                else:
+                    st.caption("⚠️ 財報數據未載入（優雅降級；回測結果不受影響）/ Earnings data not loaded (graceful degradation; backtest results unaffected)")
             
             st.markdown("## 📊 績效指標 / Performance Metrics")
             
@@ -582,10 +712,11 @@ def main():
             tab1, tab2 = st.tabs(["權益曲線 / Equity Curve", "回撤圖 / Drawdown"])
             
             with tab1:
-                # Pass calendar events to chart (L1 display only - does not affect L0 backtest)
+                # Pass calendar events and earnings to chart (L1 display only - does not affect L0 backtest)
                 chart_events = calendar_events if (show_calendar and calendar_loaded) else None
+                chart_earnings = earnings_events if (show_earnings and earnings_loaded) else None
                 st.plotly_chart(
-                    plot_equity_curve(equity_curve, buy_hold_curve, event_markers=chart_events),
+                    plot_equity_curve(equity_curve, buy_hold_curve, event_markers=chart_events, earnings_markers=chart_earnings),
                     use_container_width=True
                 )
             
@@ -633,6 +764,32 @@ def main():
                         f"⚠️ 研究用途、非完整歷史（來源：{news_source}）/ For research only, not comprehensive (source: {news_source})\n\n"
                         f"💡 情緒標籤為簡單啟發式分類，僅供參考 / Sentiment labels are simple heuristic-based, for reference only"
                     )
+            
+            # Earnings events table (L1 display)
+            if show_earnings and earnings_loaded and earnings_events is not None and not earnings_events.empty:
+                with st.expander("📊 財報事件列表 / Earnings Events List", expanded=False):
+                    earnings_display = earnings_events[["Date", "Event", "Symbol"]].copy()
+                    earnings_display["Date"] = earnings_display["Date"].dt.strftime("%Y-%m-%d")
+                    
+                    st.dataframe(
+                        earnings_display,
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                    st.caption(
+                        f"⚠️ 研究用途、非完整歷史（來源：{earnings_source}）/ For research only, not comprehensive (source: {earnings_source})\n\n"
+                        f"💡 單一股票顯示財報日期；指數／ETF 為樣本數據 / Single stocks show earnings dates; index/ETF shows sample data"
+                    )
+                    
+                    # CSV export option
+                    if st.button("📥 匯出財報事件 CSV / Export Earnings Events CSV"):
+                        csv = earnings_events.to_csv(index=False)
+                        st.download_button(
+                            label="下載 CSV / Download CSV",
+                            data=csv,
+                            file_name=f"earnings_events_{symbol}_{data.index.min().strftime('%Y%m%d')}_{data.index.max().strftime('%Y%m%d')}.csv",
+                            mime="text/csv",
+                        )
             
             # Research filter comparison (opt-in only, shows side-by-side)
             if show_calendar and calendar_loaded and calendar_filter_enabled and calendar_events is not None:
@@ -711,6 +868,87 @@ def main():
                     "對比完整回測與過濾後結果，可研究經濟數據發布對策略績效的影響。"
                     "若過濾後績效顯著改善，可考慮將「避開公佈日」納入 L2 事件驅動策略（需獨立開發與測試）。\n\n"
                     "Comparing full vs. filtered results helps research the impact of economic releases on strategy performance. "
+                    "If filtered performance is significantly better, consider developing an L2 event-driven strategy (requires separate development and testing)."
+                )
+            
+            # Earnings research filter comparison (opt-in only)
+            if show_earnings and earnings_loaded and earnings_filter_enabled and earnings_events is not None:
+                st.markdown("---")
+                st.markdown("## 🔬 財報過濾對比 / Earnings Filter Comparison")
+                st.warning(
+                    "⚠️ **研究過濾警告 / Research Filter Notice**\n\n"
+                    "此過濾僅用於研究目的，比較避開財報發布日的績效差異。"
+                    "**主回測結果（上方）保持不變**，此處顯示過濾後的次要結果供對比參考。\n\n"
+                    "This filter is for research purposes only, comparing performance when avoiding earnings dates. "
+                    "**Main backtest results (above) remain unchanged**. Filtered results shown here for comparison."
+                )
+                
+                # Create exclusion window
+                earnings_calendar_obj = EarningsCalendar()
+                earnings_calendar_obj.load(symbol=symbol, start_date=data.index.min(), end_date=data.index.max())
+                earnings_dates = earnings_calendar_obj.get_event_dates(
+                    start_date=data.index.min(),
+                    end_date=data.index.max(),
+                    symbol=symbol if earnings_source != "sample_csv" else None,
+                )
+                excluded_earnings_dates = earnings_calendar_obj.create_exclusion_window(
+                    earnings_dates,
+                    days_before=earnings_filter_days_before,
+                    days_after=earnings_filter_days_after,
+                )
+                
+                # Filter trades
+                trades_df = engine.get_trades_df()
+                filtered_earnings_trades_df = earnings_calendar_obj.filter_trades_by_exclusion(
+                    trades_df,
+                    excluded_earnings_dates,
+                    entry_column="Entry Date",
+                )
+                
+                # Calculate filtered metrics
+                from backtester.earnings_calendar import calculate_research_metrics as calc_earnings_metrics
+                filtered_earnings_metrics = calc_earnings_metrics(
+                    filtered_earnings_trades_df,
+                    initial_capital,
+                    equity_curve,
+                )
+                
+                st.markdown("### 對比摘要 / Comparison Summary")
+                col_left, col_right = st.columns(2)
+                
+                with col_left:
+                    st.markdown("**🔵 完整回測 / Full Backtest**")
+                    st.metric("交易次數 / Trades", metrics.get('trade_count', 0))
+                    st.metric("總回報 / Return", f"{metrics.get('total_return_pct', 0):.2f}%")
+                    st.metric("勝率 / Win Rate", f"{metrics.get('win_rate_pct', 0):.1f}%")
+                
+                with col_right:
+                    st.markdown(f"**🔬 過濾後（避開財報 ±{earnings_filter_days_before}/{earnings_filter_days_after} 日）/ Filtered**")
+                    excluded_count = metrics.get('trade_count', 0) - filtered_earnings_metrics['trade_count']
+                    st.metric(
+                        "交易次數 / Trades",
+                        filtered_earnings_metrics['trade_count'],
+                        delta=f"-{excluded_count}",
+                        delta_color="off"
+                    )
+                    return_delta = filtered_earnings_metrics['total_return_pct'] - metrics.get('total_return_pct', 0)
+                    st.metric(
+                        "總回報 / Return",
+                        f"{filtered_earnings_metrics['total_return_pct']:.2f}%",
+                        delta=f"{return_delta:+.2f}%",
+                    )
+                    win_rate_delta = filtered_earnings_metrics['win_rate_pct'] - metrics.get('win_rate_pct', 0)
+                    st.metric(
+                        "勝率 / Win Rate",
+                        f"{filtered_earnings_metrics['win_rate_pct']:.1f}%",
+                        delta=f"{win_rate_delta:+.1f}%",
+                    )
+                
+                st.info(
+                    "💡 **解讀 / Interpretation**\n\n"
+                    "對比完整回測與過濾後結果，可研究財報發布對策略績效的影響。"
+                    "若過濾後績效顯著改善，可考慮將「避開財報日」納入 L2 事件驅動策略（需獨立開發與測試）。\n\n"
+                    "Comparing full vs. filtered results helps research the impact of earnings releases on strategy performance. "
                     "If filtered performance is significantly better, consider developing an L2 event-driven strategy (requires separate development and testing)."
                 )
             
