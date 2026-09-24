@@ -16,6 +16,7 @@ from backtester.engine import BacktestEngine
 from backtester.metrics import PerformanceMetrics, calculate_buy_and_hold
 from backtester.strategies.sma_crossover import SMACrossover
 from backtester.strategies.rsi_mean_reversion import RSIMeanReversion
+from backtester.economic_calendar import EconomicCalendar, calculate_research_metrics
 
 
 st.set_page_config(
@@ -25,8 +26,12 @@ st.set_page_config(
 )
 
 
-def plot_equity_curve(equity_df: pd.DataFrame, buy_hold_df: Optional[pd.DataFrame] = None) -> go.Figure:
-    """Create equity curve chart with optional buy-and-hold benchmark."""
+def plot_equity_curve(
+    equity_df: pd.DataFrame,
+    buy_hold_df: Optional[pd.DataFrame] = None,
+    event_markers: Optional[pd.DataFrame] = None,
+) -> go.Figure:
+    """Create equity curve chart with optional buy-and-hold benchmark and event markers."""
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=equity_df.index,
@@ -45,12 +50,63 @@ def plot_equity_curve(equity_df: pd.DataFrame, buy_hold_df: Optional[pd.DataFram
             line=dict(color="#95A5A6", width=2, dash="dash"),
         ))
     
+    # Add economic event markers (L1 display layer - does not affect L0 backtest)
+    if event_markers is not None and not event_markers.empty:
+        # Group by event type for color coding
+        event_colors = {
+            "CPI": "#E74C3C",
+            "NFP": "#F39C12",
+            "FOMC": "#9B59B6",
+            "Unemployment": "#3498DB",
+            "GDP": "#1ABC9C",
+        }
+        
+        for event_type in event_markers["Type"].unique():
+            type_events = event_markers[event_markers["Type"] == event_type]
+            
+            # Get y-values at event dates for scatter plot
+            y_values = []
+            x_values = []
+            for event_date in type_events["Date"]:
+                # Find closest equity value
+                if event_date in equity_df.index:
+                    y_values.append(equity_df.loc[event_date, "Equity"])
+                    x_values.append(event_date)
+                else:
+                    # Find nearest date
+                    nearest_idx = equity_df.index.get_indexer([event_date], method="nearest")[0]
+                    if 0 <= nearest_idx < len(equity_df):
+                        y_values.append(equity_df.iloc[nearest_idx]["Equity"])
+                        x_values.append(event_date)
+            
+            if x_values and y_values:
+                fig.add_trace(go.Scatter(
+                    x=x_values,
+                    y=y_values,
+                    mode="markers",
+                    name=f"{event_type}",
+                    marker=dict(
+                        size=8,
+                        color=event_colors.get(event_type, "#34495E"),
+                        symbol="diamond",
+                        line=dict(width=1, color="white"),
+                    ),
+                    hovertemplate="<b>%{x}</b><br>" + f"{event_type}<br>" + "權益 / Equity: $%{y:,.0f}<extra></extra>",
+                ))
+    
     fig.update_layout(
         title="權益曲線 / Equity Curve",
         xaxis_title="日期 / Date",
         yaxis_title="權益 / Equity ($)",
         hovermode="x unified",
         template="plotly_white",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
     )
     return fig
 
@@ -212,6 +268,61 @@ def main():
             )
         
         st.markdown("---")
+        st.subheader("📅 經濟日曆 / Economic Calendar")
+        st.caption("L1 研究層：顯示與對齊 / L1 Research: Display & Alignment")
+        
+        show_calendar = st.checkbox(
+            "顯示經濟公佈日 / Show Economic Releases",
+            value=True,
+            help="在圖表上標記重要經濟數據發布日期 / Mark major economic data release dates on chart"
+        )
+        
+        calendar_event_types = []
+        calendar_filter_enabled = False
+        calendar_filter_days_before = 0
+        calendar_filter_days_after = 0
+        
+        if show_calendar:
+            # Load calendar to get available types
+            temp_cal = EconomicCalendar()
+            if temp_cal.load():
+                available_types = temp_cal.get_available_types()
+                calendar_event_types = st.multiselect(
+                    "事件類型 / Event Types",
+                    options=available_types,
+                    default=available_types,
+                    help="選擇要顯示的經濟事件類型 / Select economic event types to display"
+                )
+                
+                st.markdown("**⚠️ 研究過濾（可選）/ Research Filter (Optional)**")
+                st.caption("此過濾僅用於研究對比，不會修改主回測結果 / For research comparison only, does not modify main backtest results")
+                
+                calendar_filter_enabled = st.checkbox(
+                    "啟用避開公佈日過濾 / Enable Release Date Avoidance Filter",
+                    value=False,
+                    help="過濾在經濟數據發布前後±N天進場的交易（僅研究用途）/ Filter trades entered ±N days around releases (research only)"
+                )
+                
+                if calendar_filter_enabled:
+                    col_before, col_after = st.columns(2)
+                    with col_before:
+                        calendar_filter_days_before = st.number_input(
+                            "避開前 N 日 / Days Before",
+                            min_value=0,
+                            max_value=5,
+                            value=1,
+                            step=1,
+                        )
+                    with col_after:
+                        calendar_filter_days_after = st.number_input(
+                            "避開後 N 日 / Days After",
+                            min_value=0,
+                            max_value=5,
+                            value=0,
+                            step=1,
+                        )
+        
+        st.markdown("---")
         run_backtest = st.button("🚀 運行回測 / Run Backtest", use_container_width=True)
     
     if run_backtest:
@@ -278,7 +389,27 @@ def main():
                 )
                 metrics = metrics_calculator.calculate_all()
             
+            # Load economic calendar if enabled (L1 layer - does not affect L0 backtest)
+            calendar_events = None
+            calendar_loaded = False
+            if show_calendar and calendar_event_types:
+                economic_calendar = EconomicCalendar()
+                if economic_calendar.load():
+                    calendar_loaded = True
+                    calendar_events = economic_calendar.filter_by_date_range(
+                        start_date=data.index.min(),
+                        end_date=data.index.max(),
+                        event_types=calendar_event_types if calendar_event_types else None,
+                    )
+            
             st.success("✅ 回測完成 / Backtest complete!")
+            
+            # Display calendar status if enabled
+            if show_calendar:
+                if calendar_loaded and calendar_events is not None and not calendar_events.empty:
+                    st.info(f"📅 已載入 {len(calendar_events)} 個經濟事件標記 / Loaded {len(calendar_events)} economic event markers")
+                elif show_calendar:
+                    st.caption("⚠️ 經濟日曆數據未載入（優雅降級）/ Economic calendar data not loaded (graceful degradation)")
             
             st.markdown("## 📊 績效指標 / Performance Metrics")
             
@@ -367,10 +498,110 @@ def main():
             tab1, tab2 = st.tabs(["權益曲線 / Equity Curve", "回撤圖 / Drawdown"])
             
             with tab1:
-                st.plotly_chart(plot_equity_curve(equity_curve, buy_hold_curve), use_container_width=True)
+                # Pass calendar events to chart (L1 display only - does not affect L0 backtest)
+                chart_events = calendar_events if (show_calendar and calendar_loaded) else None
+                st.plotly_chart(
+                    plot_equity_curve(equity_curve, buy_hold_curve, event_markers=chart_events),
+                    use_container_width=True
+                )
             
             with tab2:
                 st.plotly_chart(plot_drawdown(equity_curve), use_container_width=True)
+            
+            st.markdown("---")
+            
+            # Economic events table (L1 display)
+            if show_calendar and calendar_loaded and calendar_events is not None and not calendar_events.empty:
+                with st.expander("📅 經濟事件列表 / Economic Events List", expanded=False):
+                    st.dataframe(
+                        calendar_events.style.format({"Date": lambda x: x.strftime("%Y-%m-%d")}),
+                        use_container_width=True,
+                    )
+                    st.caption(
+                        "🕐 時區：美東時間（US Eastern Time）｜"
+                        "資料來源：靜態 CSV（可定期更新）｜"
+                        "Data source: Static CSV (periodic updates) | Timezone: US Eastern"
+                    )
+            
+            # Research filter comparison (opt-in only, shows side-by-side)
+            if show_calendar and calendar_loaded and calendar_filter_enabled and calendar_events is not None:
+                st.markdown("---")
+                st.markdown("## 🔬 研究過濾對比 / Research Filter Comparison")
+                st.warning(
+                    "⚠️ **研究過濾警告 / Research Filter Notice**\n\n"
+                    "此過濾僅用於研究目的，比較避開經濟數據發布日的績效差異。"
+                    "**主回測結果（上方）保持不變**，此處顯示過濾後的次要結果供對比參考。\n\n"
+                    "This filter is for research purposes only, comparing performance when avoiding economic release dates. "
+                    "**Main backtest results (above) remain unchanged**. Filtered results shown here for comparison."
+                )
+                
+                # Create exclusion window
+                economic_calendar_obj = EconomicCalendar()
+                economic_calendar_obj.load()
+                event_dates = economic_calendar_obj.get_event_dates(
+                    start_date=data.index.min(),
+                    end_date=data.index.max(),
+                    event_types=calendar_event_types if calendar_event_types else None,
+                )
+                excluded_dates = economic_calendar_obj.create_exclusion_window(
+                    event_dates,
+                    days_before=calendar_filter_days_before,
+                    days_after=calendar_filter_days_after,
+                )
+                
+                # Filter trades
+                trades_df = engine.get_trades_df()
+                filtered_trades_df = economic_calendar_obj.filter_trades_by_exclusion(
+                    trades_df,
+                    excluded_dates,
+                    entry_column="Entry Date",
+                )
+                
+                # Calculate filtered metrics
+                filtered_metrics = calculate_research_metrics(
+                    filtered_trades_df,
+                    initial_capital,
+                    equity_curve,
+                )
+                
+                st.markdown("### 對比摘要 / Comparison Summary")
+                col_left, col_right = st.columns(2)
+                
+                with col_left:
+                    st.markdown("**🔵 完整回測 / Full Backtest**")
+                    st.metric("交易次數 / Trades", metrics.get('trade_count', 0))
+                    st.metric("總回報 / Return", f"{metrics.get('total_return_pct', 0):.2f}%")
+                    st.metric("勝率 / Win Rate", f"{metrics.get('win_rate_pct', 0):.1f}%")
+                
+                with col_right:
+                    st.markdown(f"**🔬 過濾後（避開 ±{calendar_filter_days_before}/{calendar_filter_days_after} 日）/ Filtered**")
+                    excluded_count = metrics.get('trade_count', 0) - filtered_metrics['trade_count']
+                    st.metric(
+                        "交易次數 / Trades",
+                        filtered_metrics['trade_count'],
+                        delta=f"-{excluded_count}",
+                        delta_color="off"
+                    )
+                    return_delta = filtered_metrics['total_return_pct'] - metrics.get('total_return_pct', 0)
+                    st.metric(
+                        "總回報 / Return",
+                        f"{filtered_metrics['total_return_pct']:.2f}%",
+                        delta=f"{return_delta:+.2f}%",
+                    )
+                    win_rate_delta = filtered_metrics['win_rate_pct'] - metrics.get('win_rate_pct', 0)
+                    st.metric(
+                        "勝率 / Win Rate",
+                        f"{filtered_metrics['win_rate_pct']:.1f}%",
+                        delta=f"{win_rate_delta:+.1f}%",
+                    )
+                
+                st.info(
+                    "💡 **解讀 / Interpretation**\n\n"
+                    "對比完整回測與過濾後結果，可研究經濟數據發布對策略績效的影響。"
+                    "若過濾後績效顯著改善，可考慮將「避開公佈日」納入 L2 事件驅動策略（需獨立開發與測試）。\n\n"
+                    "Comparing full vs. filtered results helps research the impact of economic releases on strategy performance. "
+                    "If filtered performance is significantly better, consider developing an L2 event-driven strategy (requires separate development and testing)."
+                )
             
             st.markdown("---")
             
