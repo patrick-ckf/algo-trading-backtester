@@ -16,6 +16,11 @@ from backtester.engine import BacktestEngine
 from backtester.metrics import PerformanceMetrics, calculate_buy_and_hold
 from backtester.strategies.sma_crossover import SMACrossover
 from backtester.strategies.rsi_mean_reversion import RSIMeanReversion
+from backtester.ticker_presets import (
+    get_grouped_ticker_options,
+    is_separator,
+    get_ticker_description,
+)
 
 
 st.set_page_config(
@@ -107,7 +112,48 @@ def main():
         data_path = None
         
         if data_source == "Yahoo Finance":
-            symbol = st.text_input("股票代號 / Symbol", value="SPY")
+            # Phase 1: Quick-pick shortcuts for common indices/ETFs
+            ticker_options = get_grouped_ticker_options()
+            
+            # Initialize session state for symbol if not exists
+            if "current_symbol" not in st.session_state:
+                st.session_state.current_symbol = "SPY"
+            
+            # Quick-pick selectbox
+            st.markdown("**快速選擇 / Quick Select**")
+            selected_preset = st.selectbox(
+                "常用指數/ETF",
+                options=ticker_options,
+                index=ticker_options.index("SPY") if "SPY" in ticker_options else 0,
+                format_func=lambda x: x if not is_separator(x) else f"─────────────",
+                label_visibility="collapsed",
+                key="preset_selector",
+            )
+            
+            # If a valid ticker is selected (not a separator or manual input header)
+            if not is_separator(selected_preset):
+                st.session_state.current_symbol = selected_preset
+            
+            # Manual input field (always available)
+            st.markdown("**或手動輸入 / Or Manual Input**")
+            manual_symbol = st.text_input(
+                "股票代號 / Symbol",
+                value=st.session_state.current_symbol,
+                label_visibility="collapsed",
+                key="manual_input",
+            )
+            
+            # Use manual input if it differs from current state
+            if manual_symbol != st.session_state.current_symbol:
+                st.session_state.current_symbol = manual_symbol
+            
+            symbol = st.session_state.current_symbol
+            
+            # Show description if available
+            description = get_ticker_description(symbol)
+            if description:
+                st.caption(f"📊 {description}")
+            
             col1, col2 = st.columns(2)
             with col1:
                 start_date = st.date_input(
