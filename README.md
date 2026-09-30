@@ -21,6 +21,7 @@
 - ✅ **Phase 2**: 經濟日曆疊加層 / Economic calendar overlay ([docs](docs/PHASE2-economic-calendar.md))
 - ✅ **Phase 3**: 新聞研究面板 / News research panel ([docs](docs/PHASE3-news-panel.md))
 - ✅ **Phase 4**: 財報／商蹤時間線 / Earnings timeline ([docs](docs/PHASE4-earnings-timeline.md))
+- ✅ **Phase 5**: 事件驅動策略規則 / Event-driven strategy rules ([docs](docs/PHASE5-event-driven-rules.md))
 
 ### 已完成階段
 
@@ -36,6 +37,18 @@
   - 符號過濾與指數關鍵字匹配（如 SPY → S&P 500）
   - 示範 CSV + yfinance 降級，無需 API key
   - Phase 0 合規：L1 研究層，情緒標籤不影響交易訊號
+- **Phase 4**：財報／商蹤時間線 ✅ → [docs/PHASE4-earnings-timeline.md](docs/PHASE4-earnings-timeline.md)
+  - 回測期間財報發布日期顯示
+  - 單一股票支援（yfinance + 示範 CSV）
+  - 指數／ETF 優雅降級（樣本數據）
+  - 圖表疊加顯示與事件列表
+  - Phase 0 合規：L1 研究層，不修改 L0 回測引擎
+- **Phase 5**：事件驅動策略規則 ✅ → [docs/PHASE5-event-driven-rules.md](docs/PHASE5-event-driven-rules.md)
+  - Opt-in 事件驅動規則（L2 層）
+  - 控制組 vs 事件感知策略對比
+  - 在已知事件前後阻止買入訊號（可配置黑名單窗口）
+  - 經濟事件 + 財報事件黑名單
+  - Phase 0 合規：預設關閉，L0 控制回測始終顯示，對照測試
 
 ## 內建策略
 

@@ -19,6 +19,7 @@ from backtester.strategies.rsi_mean_reversion import RSIMeanReversion
 from backtester.economic_calendar import EconomicCalendar, calculate_research_metrics, _to_naive_day
 from backtester.news import NewsPanel
 from backtester.earnings_calendar import EarningsCalendar
+from backtester.event_rules import EventRuleConfig, run_control_vs_event_aware
 from backtester.ticker_presets import (
     get_grouped_ticker_options,
     is_separator,
@@ -854,6 +855,103 @@ def main():
                     )
         
         st.markdown("---")
+        st.subheader("🎯 Phase 5：事件驅動規則 / Event-Driven Rules")
+        st.caption("L2 層：可選事件感知策略 / L2 Layer: Opt-in event-aware strategy")
+        
+        enable_phase5 = st.checkbox(
+            "啟用 Phase 5 對比 / Enable Phase 5 Comparison",
+            value=False,
+            help="運行控制組與事件感知策略對比（在已知事件前後阻止進場）/ Run control vs event-aware strategy comparison (blocks entries around known events)"
+        )
+        
+        phase5_economic_enabled = False
+        phase5_economic_types = None
+        phase5_economic_before = 1
+        phase5_economic_after = 0
+        phase5_earnings_enabled = False
+        phase5_earnings_before = 1
+        phase5_earnings_after = 0
+        
+        if enable_phase5:
+            st.info(
+                "⚠️ **Phase 5 說明 / Phase 5 Notice**\n\n"
+                "Phase 5 會運行兩個回測：\n"
+                "1. **控制組**：您的策略不變（L0 預設）\n"
+                "2. **事件感知**：同樣策略，但在事件前後 ±N 日阻止買入訊號（L2 規則）\n\n"
+                "Phase 5 runs two backtests:\n"
+                "1. **Control**: Your strategy unchanged (L0 default)\n"
+                "2. **Event-aware**: Same strategy, but blocks BUY signals ±N days around events (L2 rules)"
+            )
+            
+            st.markdown("**經濟事件黑名單 / Economic Event Blackout**")
+            phase5_economic_enabled = st.checkbox(
+                "使用經濟事件黑名單 / Use Economic Event Blackout",
+                value=True,
+                help="在重要經濟數據發布前後阻止進場 / Block entries around major economic releases"
+            )
+            
+            if phase5_economic_enabled:
+                # Load calendar to get available types
+                temp_cal = EconomicCalendar()
+                if temp_cal.load():
+                    available_types = temp_cal.get_available_types()
+                    phase5_economic_types = st.multiselect(
+                        "事件類型 / Event Types",
+                        options=available_types,
+                        default=available_types,
+                        help="選擇要避開的經濟事件類型 / Select economic event types to avoid",
+                        key="phase5_econ_types"
+                    )
+                
+                col_before, col_after = st.columns(2)
+                with col_before:
+                    phase5_economic_before = st.number_input(
+                        "前 N 日 / Days Before",
+                        min_value=0,
+                        max_value=5,
+                        value=1,
+                        step=1,
+                        key="phase5_econ_before"
+                    )
+                with col_after:
+                    phase5_economic_after = st.number_input(
+                        "後 N 日 / Days After",
+                        min_value=0,
+                        max_value=5,
+                        value=0,
+                        step=1,
+                        key="phase5_econ_after"
+                    )
+            
+            st.markdown("**財報事件黑名單 / Earnings Event Blackout**")
+            phase5_earnings_enabled = st.checkbox(
+                "使用財報事件黑名單 / Use Earnings Event Blackout",
+                value=True,
+                help="在財報發布前後阻止進場 / Block entries around earnings releases"
+            )
+            
+            if phase5_earnings_enabled:
+                col_before, col_after = st.columns(2)
+                with col_before:
+                    phase5_earnings_before = st.number_input(
+                        "前 N 日（財報）/ Days Before (Earnings)",
+                        min_value=0,
+                        max_value=5,
+                        value=1,
+                        step=1,
+                        key="phase5_earn_before"
+                    )
+                with col_after:
+                    phase5_earnings_after = st.number_input(
+                        "後 N 日（財報）/ Days After (Earnings)",
+                        min_value=0,
+                        max_value=5,
+                        value=0,
+                        step=1,
+                        key="phase5_earn_after"
+                    )
+        
+        st.markdown("---")
         run_backtest = st.button("🚀 運行回測 / Run Backtest", use_container_width=True)
     
     if run_backtest:
@@ -883,27 +981,75 @@ def main():
                 st.success(f"✅ 加載 {len(data)} 個數據點 / Loaded {len(data)} bars")
             
             with st.spinner("正在運行回測... / Running backtest..."):
+                # Determine strategy class
                 if strategy_type == "SMA Crossover":
-                    strategy = SMACrossover(
-                        fast_period=int(fast_period),
-                        slow_period=int(slow_period),
-                    )
+                    strategy_class = SMACrossover
+                    strategy_params = {
+                        "fast_period": int(fast_period),
+                        "slow_period": int(slow_period),
+                    }
                 else:
-                    strategy = RSIMeanReversion(
-                        period=int(rsi_period),
-                        oversold=rsi_oversold,
-                        overbought=rsi_overbought,
+                    strategy_class = RSIMeanReversion
+                    strategy_params = {
+                        "period": int(rsi_period),
+                        "oversold": rsi_oversold,
+                        "overbought": rsi_overbought,
+                    }
+                
+                # Phase 5: Run control vs event-aware comparison if enabled
+                if enable_phase5:
+                    # Configure event rules
+                    event_config = EventRuleConfig(
+                        enabled=True,
+                        use_economic_events=phase5_economic_enabled,
+                        economic_event_types=phase5_economic_types if phase5_economic_enabled else None,
+                        economic_days_before=phase5_economic_before,
+                        economic_days_after=phase5_economic_after,
+                        use_earnings_events=phase5_earnings_enabled,
+                        earnings_days_before=phase5_earnings_before,
+                        earnings_days_after=phase5_earnings_after,
                     )
-                
-                engine = BacktestEngine(
-                    initial_capital=initial_capital,
-                    commission=commission,
-                    slippage=slippage,
-                    position_size_type="fixed_fraction",
-                    position_size_value=position_size,
-                )
-                
-                equity_curve = engine.run(strategy, data)
+                    
+                    # Create strategy instance factory
+                    def create_strategy():
+                        return strategy_class(**strategy_params)
+                    
+                    # Run comparison
+                    phase5_results = run_control_vs_event_aware(
+                        strategy=create_strategy,
+                        data=data,
+                        initial_capital=initial_capital,
+                        commission=commission,
+                        slippage=slippage,
+                        position_size=position_size,
+                        event_config=event_config,
+                        symbol=symbol,
+                    )
+                    
+                    # Extract control results (this is the L0 default)
+                    engine = phase5_results["control"]["engine"]
+                    equity_curve = phase5_results["control"]["equity"]
+                    
+                    # Store event-aware results for later display
+                    phase5_event_engine = phase5_results["event_aware"]["engine"]
+                    phase5_event_equity = phase5_results["event_aware"]["equity"]
+                    phase5_blocked_signals = phase5_results["event_aware"]["blocked_signals"]
+                else:
+                    # Standard L0 backtest (no Phase 5)
+                    strategy = strategy_class(**strategy_params)
+                    
+                    engine = BacktestEngine(
+                        initial_capital=initial_capital,
+                        commission=commission,
+                        slippage=slippage,
+                        position_size_type="fixed_fraction",
+                        position_size_value=position_size,
+                    )
+                    
+                    equity_curve = engine.run(strategy, data)
+                    phase5_event_engine = None
+                    phase5_event_equity = None
+                    phase5_blocked_signals = 0
                 
                 # Calculate buy-and-hold benchmark
                 buy_hold_curve = calculate_buy_and_hold(
@@ -1078,6 +1224,135 @@ def main():
                 "the buy-and-hold benchmark. These strategies are for educational and research purposes only "
                 "and do not constitute investment advice. Past performance does not guarantee future results."
             )
+            
+            # Phase 5 comparison display
+            if enable_phase5 and phase5_event_engine is not None:
+                st.markdown("---")
+                st.markdown("## 🎯 Phase 5：控制組 vs 事件感知對比 / Control vs Event-Aware Comparison")
+                
+                st.warning(
+                    "⚠️ **Phase 5 對比說明 / Phase 5 Comparison Notice**\n\n"
+                    "**控制組（上方）**：您的策略不變，這是 L0 預設回測結果。\n"
+                    "**事件感知（下方）**：同樣策略，但在已知事件前後阻止買入訊號（L2 事件驅動規則）。\n\n"
+                    "**Control (above)**: Your strategy unchanged, this is the L0 default backtest result.\n"
+                    "**Event-aware (below)**: Same strategy, but blocks BUY signals around known events (L2 event-driven rules)."
+                )
+                
+                # Calculate event-aware metrics
+                phase5_event_metrics_calc = PerformanceMetrics(
+                    equity_curve=phase5_event_equity,
+                    trades=phase5_event_engine.trades,
+                    initial_capital=initial_capital,
+                    buy_hold_curve=buy_hold_curve,
+                )
+                phase5_event_metrics = phase5_event_metrics_calc.calculate_all()
+                
+                st.markdown("### 績效對比摘要 / Performance Comparison Summary")
+                
+                col_left, col_right = st.columns(2)
+                
+                with col_left:
+                    st.markdown("**🔵 控制組（L0 預設）/ Control (L0 Default)**")
+                    st.metric("交易次數 / Trades", metrics.get('trade_count', 0))
+                    st.metric("總回報 / Return", f"{metrics.get('total_return_pct', 0):.2f}%")
+                    st.metric("夏普比率 / Sharpe", format_metric(metrics.get('sharpe_ratio', float('nan')), fmt=".2f"))
+                    st.metric("最大回撤 / Max DD", f"{metrics.get('max_drawdown_pct', 0):.2f}%")
+                    st.metric("勝率 / Win Rate", f"{metrics.get('win_rate_pct', 0):.1f}%")
+                
+                with col_right:
+                    st.markdown("**🟢 事件感知（L2 規則）/ Event-Aware (L2 Rules)**")
+                    blocked_count = metrics.get('trade_count', 0) - phase5_event_metrics.get('trade_count', 0)
+                    st.metric(
+                        "交易次數 / Trades",
+                        phase5_event_metrics.get('trade_count', 0),
+                        delta=f"-{blocked_count} (阻止 {phase5_blocked_signals} 訊號 / blocked {phase5_blocked_signals} signals)",
+                        delta_color="off"
+                    )
+                    return_delta = phase5_event_metrics.get('total_return_pct', 0) - metrics.get('total_return_pct', 0)
+                    st.metric(
+                        "總回報 / Return",
+                        f"{phase5_event_metrics.get('total_return_pct', 0):.2f}%",
+                        delta=f"{return_delta:+.2f}%",
+                    )
+                    sharpe_control = metrics.get('sharpe_ratio', float('nan'))
+                    sharpe_event = phase5_event_metrics.get('sharpe_ratio', float('nan'))
+                    sharpe_delta = sharpe_event - sharpe_control if not (pd.isna(sharpe_control) or pd.isna(sharpe_event)) else float('nan')
+                    st.metric(
+                        "夏普比率 / Sharpe",
+                        format_metric(sharpe_event, fmt=".2f"),
+                        delta=format_metric(sharpe_delta, fmt=".2f") if not pd.isna(sharpe_delta) else "N/A",
+                    )
+                    dd_delta = phase5_event_metrics.get('max_drawdown_pct', 0) - metrics.get('max_drawdown_pct', 0)
+                    st.metric(
+                        "最大回撤 / Max DD",
+                        f"{phase5_event_metrics.get('max_drawdown_pct', 0):.2f}%",
+                        delta=f"{dd_delta:+.2f}%",
+                        delta_color="inverse",
+                    )
+                    win_rate_delta = phase5_event_metrics.get('win_rate_pct', 0) - metrics.get('win_rate_pct', 0)
+                    st.metric(
+                        "勝率 / Win Rate",
+                        f"{phase5_event_metrics.get('win_rate_pct', 0):.1f}%",
+                        delta=f"{win_rate_delta:+.1f}%",
+                    )
+                
+                st.info(
+                    "💡 **解讀 / Interpretation**\n\n"
+                    "對比控制組與事件感知結果，可研究在已知事件前後阻止進場對策略績效的影響。\n"
+                    "若事件感知版本績效顯著改善，可考慮將事件規則整合到策略中（需獨立驗證與測試）。\n\n"
+                    "Comparing control vs. event-aware results helps research the impact of blocking entries around known events. "
+                    "If event-aware performance is significantly better, consider integrating event rules into your strategy (requires independent validation and testing)."
+                )
+                
+                # Overlay equity curves
+                st.markdown("### 權益曲線對比 / Equity Curve Comparison")
+                fig_comparison = go.Figure()
+                
+                # Control equity curve
+                fig_comparison.add_trace(go.Scatter(
+                    x=equity_curve.index,
+                    y=equity_curve["Equity"],
+                    mode="lines",
+                    name="控制組 / Control",
+                    line=dict(color="#2E86DE", width=2),
+                ))
+                
+                # Event-aware equity curve
+                fig_comparison.add_trace(go.Scatter(
+                    x=phase5_event_equity.index,
+                    y=phase5_event_equity["Equity"],
+                    mode="lines",
+                    name="事件感知 / Event-Aware",
+                    line=dict(color="#27AE60", width=2, dash="dash"),
+                ))
+                
+                # Theme-specific styling
+                if st.session_state.theme == "light":
+                    paper_bg = "#FFFFFF"
+                    plot_bg = "#F8F9FA"
+                    font_color = "#1F2937"
+                    grid_color = "rgba(128,128,128,0.2)"
+                else:
+                    paper_bg = "rgba(0,0,0,0)"
+                    plot_bg = "rgba(0,0,0,0)"
+                    font_color = "#FAFAFA"
+                    grid_color = "rgba(128,128,128,0.15)"
+                
+                fig_comparison.update_layout(
+                    title=dict(text="控制組 vs 事件感知權益曲線 / Control vs Event-Aware Equity Curves", font=dict(color=font_color)),
+                    xaxis_title="日期 / Date",
+                    yaxis_title="權益 / Equity ($)",
+                    hovermode="x unified",
+                    template="plotly",
+                    plot_bgcolor=plot_bg,
+                    paper_bgcolor=paper_bg,
+                    font=dict(family="sans-serif", size=12, color=font_color),
+                    xaxis=dict(showgrid=True, gridwidth=1, gridcolor=grid_color, zeroline=False, color=font_color),
+                    yaxis=dict(showgrid=True, gridwidth=1, gridcolor=grid_color, zeroline=False, color=font_color),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color=font_color)),
+                )
+                
+                st.plotly_chart(fig_comparison, use_container_width=True)
             
             st.markdown("---")
             
