@@ -23,6 +23,14 @@ class DataLoader:
         Expected columns: Date, Open, High, Low, Close, Volume
         """
         df = pd.read_csv(filepath, parse_dates=["Date"], index_col="Date")
+        
+        # Ensure index is DatetimeIndex and remove timezone info to avoid alignment bugs
+        # Convert to DatetimeIndex if it's not already (handles timezone strings in CSV)
+        if not isinstance(df.index, pd.DatetimeIndex):
+            df.index = pd.to_datetime(df.index, utc=True).tz_localize(None)
+        elif df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+        
         df = df.sort_index()
         self._validate_ohlcv(df)
         df = self._clean_ohlcv(df)

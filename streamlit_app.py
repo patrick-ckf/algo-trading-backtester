@@ -25,6 +25,7 @@ from backtester.ticker_presets import (
     is_separator,
     get_ticker_description,
 )
+from backtester.portfolio import PortfolioBacktester, calculate_benchmark
 
 
 st.set_page_config(
