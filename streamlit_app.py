@@ -1635,6 +1635,51 @@ def main():
     else:
         st.info("👈 請在左側設定參數並點擊「運行回測」按鈕開始\n\n← Please configure parameters in the sidebar and click 'Run Backtest'")
         
+        # Portfolio backtest note
+        st.markdown("---")
+        st.markdown("## 💼 多資產投資組合回測 / Multi-Asset Portfolio Backtest")
+        
+        st.info(
+            "**新功能！/ New Feature!**\n\n"
+            "投資組合回測功能現已可用！請使用命令行運行：\n"
+            "Portfolio backtest is now available! Run via command line:\n\n"
+            "```bash\n"
+            "python3 examples/portfolio_demo.py\n"
+            "```\n\n"
+            "功能特色 / Features:\n"
+            "- 2-5 個資產等權重配置 / Equal-weight 2-5 assets\n"
+            "- 每月自動重新平衡 / Automatic monthly rebalancing\n"
+            "- 與 SPY 基準比較 / Compare against SPY benchmark\n"
+            "- 相關性矩陣分析 / Correlation matrix analysis\n\n"
+            "詳細文檔：docs/PORTFOLIO-BACKTEST.md\n"
+            "Full documentation: docs/PORTFOLIO-BACKTEST.md"
+        )
+        
+        with st.expander("📖 查看投資組合示例代碼 / View Portfolio Example Code"):
+            st.code('''
+from backtester.portfolio import PortfolioBacktester
+
+# Create portfolio with 3 assets
+portfolio = PortfolioBacktester(
+    tickers=["SPY", "QQQ", "IWM"],
+    start_date="2020-01-01",
+    end_date="2023-12-31",
+    initial_capital=100000.0,
+    commission=0.001,
+)
+
+# Run backtest
+portfolio.load_data()
+equity_curve = portfolio.run()
+metrics = portfolio.calculate_metrics()
+
+# View results
+print(f"Total Return: {metrics.total_return_pct:.2f}%")
+print(f"Sharpe Ratio: {metrics.sharpe_ratio:.2f}")
+print(metrics.correlation_matrix)
+            ''', language='python')
+        
+        st.markdown("---")
         st.markdown("## 快速開始 / Quick Start")
         st.markdown("""
         **預設設定已可運行：**
