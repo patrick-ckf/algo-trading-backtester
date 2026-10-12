@@ -151,5 +151,26 @@ def test_plot_equity_curve_with_tz_aware_index():
         raise
 
 
+def test_streamlit_app_imports():
+    """
+    Smoke test: verify streamlit_app.py can be imported without errors.
+    This catches syntax errors, missing imports, and initialization issues.
+    """
+    try:
+        import streamlit_app
+        assert streamlit_app is not None
+        
+        # Verify key functions exist
+        assert hasattr(streamlit_app, 'main')
+        assert hasattr(streamlit_app, 'run_portfolio_backtest')
+        assert callable(streamlit_app.main)
+        assert callable(streamlit_app.run_portfolio_backtest)
+        
+    except ImportError as e:
+        pytest.fail(f"Failed to import streamlit_app: {e}")
+    except Exception as e:
+        pytest.fail(f"Error during streamlit_app import: {e}")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
