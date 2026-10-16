@@ -8,6 +8,7 @@ import numpy as np
 
 from backtester.strategies.sma_crossover import SMACrossover
 from backtester.strategies.rsi_mean_reversion import RSIMeanReversion
+from backtester.strategies.donchian_breakout import DonchianBreakout
 
 
 def create_test_data_with_trend(bars: int = 100, trend: str = "up") -> pd.DataFrame:
@@ -229,6 +230,51 @@ def test_strategy_position_tracking():
     # Manually trigger a buy
     strategy.position = True
     assert strategy.position == True
+
+
+def test_donchian_initialization():
+    strategy = DonchianBreakout(channel_period=20)
+    assert strategy.channel_period == 20
+    assert strategy.name == "Donchian_20"
+
+
+def test_donchian_setup_calculates_channels():
+    data = create_test_data_with_trend(bars=60, trend="up")
+    strategy = DonchianBreakout(channel_period=10)
+    strategy.setup(data)
+    assert strategy.upper_channel is not None
+    assert strategy.lower_channel is not None
+    assert len(strategy.upper_channel) == len(data)
+
+
+def test_donchian_hold_during_warmup():
+    data = create_test_data_with_trend(bars=50, trend="up")
+    strategy = DonchianBreakout(channel_period=20)
+    strategy.setup(data)
+    for i in range(strategy.channel_period):
+        assert strategy.on_bar(i, data.iloc[i]) == "HOLD"
+
+
+def test_donchian_can_generate_breakout_signal():
+    dates = pd.date_range("2020-01-01", periods=80, freq="D")
+    close = np.concatenate([np.full(50, 100), np.full(30, 120)])
+    high = np.maximum(close * 1.01, close)
+    low = close * 0.99
+    data = pd.DataFrame(
+        {
+            "Open": close * 0.99,
+            "High": high,
+            "Low": low,
+            "Close": close,
+            "Volume": 1000000,
+        },
+        index=dates,
+    )
+    data.index.name = "Date"
+    strategy = DonchianBreakout(channel_period=10)
+    strategy.setup(data)
+    signals = [strategy.on_bar(i, data.iloc[i]) for i in range(len(data))]
+    assert "BUY" in signals
 
 
 def test_sma_no_signals_in_flat_market():
