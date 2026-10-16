@@ -16,6 +16,18 @@ from backtester.engine import BacktestEngine
 from backtester.metrics import PerformanceMetrics, calculate_buy_and_hold
 from backtester.strategies.sma_crossover import SMACrossover
 from backtester.strategies.rsi_mean_reversion import RSIMeanReversion
+from backtester.strategies.donchian_breakout import DonchianBreakout
+from backtester.strategy_templates import (
+    STRATEGY_SMA,
+    STRATEGY_RSI,
+    STRATEGY_DONCHIAN,
+    CUSTOM_TEMPLATE_ID,
+    apply_template_params,
+    default_template_id,
+    get_strategy_template,
+    template_label,
+    template_select_options,
+)
 from backtester.economic_calendar import EconomicCalendar, calculate_research_metrics, _to_naive_day
 from backtester.news import NewsPanel
 from backtester.earnings_calendar import EarningsCalendar
@@ -824,14 +836,48 @@ def main():
         
         st.markdown("---")
         
-        # Strategy selection only for single asset mode
+        # Strategy templates (single-asset only)
         strategy_type = None
         if backtest_mode == "單一資產 / Single Asset":
-            strategy_type = st.selectbox(
-                "策略 / Strategy",
-                ["SMA Crossover", "RSI Mean Reversion"],
-                help="選擇交易策略 / Select trading strategy"
+            if "strategy_template_picker" not in st.session_state:
+                st.session_state.strategy_template_picker = default_template_id()
+                tpl = get_strategy_template(default_template_id())
+                if tpl:
+                    apply_template_params(st.session_state, tpl)
+
+            def _on_strategy_template_change() -> None:
+                tid = st.session_state.strategy_template_picker
+                if tid == CUSTOM_TEMPLATE_ID:
+                    return
+                tpl = get_strategy_template(tid)
+                if tpl:
+                    apply_template_params(st.session_state, tpl)
+
+            st.selectbox(
+                "策略模板 / Strategy Template",
+                options=template_select_options(),
+                format_func=template_label,
+                key="strategy_template_picker",
+                on_change=_on_strategy_template_change,
+                help="一鍵套用預設策略與參數；選「自訂」可手動調整 / One-click presets; choose Custom for manual tuning",
             )
+
+            if st.session_state.strategy_template_picker != CUSTOM_TEMPLATE_ID:
+                active_tpl = get_strategy_template(st.session_state.strategy_template_picker)
+                if active_tpl and active_tpl.description:
+                    st.caption(f"💡 {active_tpl.description}")
+                strategy_type = st.session_state.get(
+                    "strategy_type",
+                    active_tpl.strategy_type if active_tpl else STRATEGY_SMA,
+                )
+                st.markdown(f"**策略 / Strategy:** {strategy_type}")
+            else:
+                strategy_type = st.selectbox(
+                    "策略 / Strategy",
+                    [STRATEGY_SMA, STRATEGY_RSI, STRATEGY_DONCHIAN],
+                    key="strategy_type",
+                    help="選擇交易策略 / Select trading strategy",
+                )
         
         st.subheader("📊 數據來源 / Data Source")
         
@@ -995,42 +1041,63 @@ def main():
         if backtest_mode == "單一資產 / Single Asset":
             st.subheader("🎯 策略參數 / Strategy Parameters")
         
-        if backtest_mode == "單一資產 / Single Asset" and strategy_type == "SMA Crossover":
+        if backtest_mode == "單一資產 / Single Asset" and strategy_type == STRATEGY_SMA:
+            if "fast_period" not in st.session_state:
+                st.session_state.fast_period = 20
+            if "slow_period" not in st.session_state:
+                st.session_state.slow_period = 50
             fast_period = st.number_input(
                 "快線週期 / Fast Period",
                 min_value=5,
                 max_value=200,
-                value=20,
                 step=5,
+                key="fast_period",
             )
             slow_period = st.number_input(
                 "慢線週期 / Slow Period",
                 min_value=10,
                 max_value=300,
-                value=50,
                 step=10,
+                key="slow_period",
             )
-        elif backtest_mode == "單一資產 / Single Asset" and strategy_type == "RSI Mean Reversion":
+        elif backtest_mode == "單一資產 / Single Asset" and strategy_type == STRATEGY_RSI:
+            if "rsi_period" not in st.session_state:
+                st.session_state.rsi_period = 14
+            if "rsi_oversold" not in st.session_state:
+                st.session_state.rsi_oversold = 30
+            if "rsi_overbought" not in st.session_state:
+                st.session_state.rsi_overbought = 70
             rsi_period = st.number_input(
                 "RSI 週期 / RSI Period",
                 min_value=5,
                 max_value=50,
-                value=14,
                 step=1,
+                key="rsi_period",
             )
             rsi_oversold = st.number_input(
                 "超賣閾值 / Oversold",
                 min_value=10,
                 max_value=40,
-                value=30,
                 step=5,
+                key="rsi_oversold",
             )
             rsi_overbought = st.number_input(
                 "超買閾值 / Overbought",
                 min_value=60,
                 max_value=90,
-                value=70,
                 step=5,
+                key="rsi_overbought",
+            )
+        elif backtest_mode == "單一資產 / Single Asset" and strategy_type == STRATEGY_DONCHIAN:
+            if "channel_period" not in st.session_state:
+                st.session_state.channel_period = 20
+            channel_period = st.number_input(
+                "通道週期 / Channel Period (days)",
+                min_value=5,
+                max_value=252,
+                step=1,
+                key="channel_period",
+                help="使用前 N 日最高/最低（不含當日）/ Prior N-day high/low excluding current bar",
             )
         
         # Research panels only for single asset mode
@@ -1288,18 +1355,23 @@ def main():
                 
                 with st.spinner("正在運行回測... / Running backtest..."):
                     # Determine strategy class
-                    if strategy_type == "SMA Crossover":
+                    if strategy_type == STRATEGY_SMA:
                         strategy_class = SMACrossover
                         strategy_params = {
                             "fast_period": int(fast_period),
                             "slow_period": int(slow_period),
                         }
-                    else:
+                    elif strategy_type == STRATEGY_RSI:
                         strategy_class = RSIMeanReversion
                         strategy_params = {
                             "period": int(rsi_period),
                             "oversold": rsi_oversold,
                             "overbought": rsi_overbought,
+                        }
+                    else:
+                        strategy_class = DonchianBreakout
+                        strategy_params = {
+                            "channel_period": int(channel_period),
                         }
                     
                     # Phase 5: Run control vs event-aware comparison if enabled
@@ -1944,12 +2016,12 @@ def main():
         st.markdown("""
         **預設設定已可運行：**
         1. 數據來源：Yahoo Finance（SPY，2018-01-01 至今）
-        2. 策略：SMA 交叉（快線 20 / 慢線 50）
+        2. 策略模板：雙均線交叉 20/50（可切換其他預設或「自訂」）
         3. 點擊「運行回測」按鈕
         
         **Default settings are ready to run:**
         1. Data source: Yahoo Finance (SPY, 2018-01-01 to today)
-        2. Strategy: SMA Crossover (fast 20 / slow 50)
+        2. Strategy template: Dual SMA 20/50 (switch presets or Custom)
         3. Click 'Run Backtest' button
         
         ---
