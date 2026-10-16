@@ -38,6 +38,24 @@ from backtester.ticker_presets import (
     get_ticker_description,
 )
 from backtester.portfolio import PortfolioBacktester, calculate_benchmark
+from backtester.parameter_scan import (
+    MAX_GRID_COMBINATIONS,
+    METRIC_MAX_DRAWDOWN,
+    METRIC_SHARPE,
+    METRIC_TOTAL_RETURN,
+    RANK_METRIC_OPTIONS,
+    arange_params,
+    apply_params_to_session,
+    count_valid_combinations,
+    metric_label,
+    param_columns_for_strategy,
+    pivot_for_heatmap,
+    plot_scan_bar_1d,
+    plot_scan_heatmap,
+    rank_grid_results,
+    run_parameter_grid,
+    validate_grid_size,
+)
 
 
 st.set_page_config(
@@ -284,6 +302,124 @@ def plot_drawdown(equity_df: pd.DataFrame, theme: str = "dark") -> go.Figure:
         ),
     )
     return fig
+
+
+def display_parameter_scan_section(
+    data: pd.DataFrame,
+    strategy_type: str,
+    param_grid: dict,
+    rank_metric: str,
+    initial_capital: float,
+    commission: float,
+    slippage: float,
+    position_size: float,
+    theme: str,
+) -> None:
+    """Run grid search and render heatmap/table (opt-in; separate from L0 main path)."""
+    ok, err_msg = validate_grid_size(strategy_type, param_grid)
+    if not ok:
+        st.error(err_msg)
+        return
+
+    n_combos = count_valid_combinations(strategy_type, param_grid)
+    st.markdown("## 🔬 參數掃描 / Parameter Scan")
+    st.caption(
+        f"獨立 L0 回測網格（最多 {MAX_GRID_COMBINATIONS} 組）/ "
+        f"Independent L0 backtest grid (max {MAX_GRID_COMBINATIONS} combos)"
+    )
+
+    progress = st.progress(0.0, text="準備掃描 / Preparing scan...")
+
+    def _on_progress(done: int, total: int) -> None:
+        progress.progress(done / total, text=f"掃描中 {done}/{total} / Scanning {done}/{total}")
+
+    try:
+        with st.spinner(f"正在掃描 {n_combos} 組參數... / Running {n_combos} grid points..."):
+            results_df = run_parameter_grid(
+                data=data,
+                strategy_type=strategy_type,
+                param_grid=param_grid,
+                initial_capital=initial_capital,
+                commission=commission,
+                slippage=slippage,
+                position_size=position_size,
+                progress_callback=_on_progress,
+            )
+    finally:
+        progress.empty()
+
+    ranked = rank_grid_results(results_df, rank_metric)
+    st.markdown(f"### 排名依據 / Ranked by {metric_label(rank_metric)}")
+
+    pivot_info = pivot_for_heatmap(ranked, strategy_type, rank_metric)
+    if pivot_info is not None:
+        pivot, x_col, y_col = pivot_info
+        st.plotly_chart(
+            plot_scan_heatmap(pivot, x_col, y_col, rank_metric, theme=theme),
+            use_container_width=True,
+        )
+    elif strategy_type == STRATEGY_DONCHIAN:
+        st.plotly_chart(
+            plot_scan_bar_1d(ranked, "channel_period", rank_metric, theme=theme),
+            use_container_width=True,
+        )
+
+    display_cols = (
+        ["rank"]
+        + param_columns_for_strategy(strategy_type)
+        + [METRIC_SHARPE, METRIC_TOTAL_RETURN, METRIC_MAX_DRAWDOWN, "trade_count"]
+    )
+    display_cols = [c for c in display_cols if c in ranked.columns]
+    st.dataframe(
+        ranked[display_cols].style.format(
+            {
+                METRIC_SHARPE: "{:.3f}",
+                METRIC_TOTAL_RETURN: "{:.2f}",
+                METRIC_MAX_DRAWDOWN: "{:.2f}",
+            },
+            na_rep="N/A",
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    option_labels = []
+    for _, row in ranked.iterrows():
+        parts = [f"#{int(row['rank'])}"]
+        for col in param_columns_for_strategy(strategy_type):
+            parts.append(f"{col}={int(row[col])}")
+        parts.append(f"{metric_label(rank_metric)}={row[rank_metric]:.3f}")
+        option_labels.append(" | ".join(parts))
+
+    st.markdown("**套用至側邊欄 / Apply to sidebar**")
+    selected_label = st.selectbox(
+        "選擇參數組 / Select parameter set",
+        options=option_labels,
+        index=0,
+        key="param_scan_row_select",
+        label_visibility="collapsed",
+    )
+    selected_idx = option_labels.index(selected_label)
+    selected_row = ranked.iloc[selected_idx]
+
+    if st.button("✅ 套用並更新側邊欄 / Apply to Sidebar", key="param_scan_apply_btn"):
+        params = {
+            col: int(selected_row[col])
+            for col in param_columns_for_strategy(strategy_type)
+        }
+        apply_params_to_session(st.session_state, strategy_type, params)
+        st.success(
+            "已套用參數（模板已切為「自訂」）。請再次點擊「運行回測」查看結果 / "
+            "Parameters applied (template set to Custom). Click Run Backtest again."
+        )
+        st.rerun()
+
+    st.info(
+        "💡 掃描結果僅供研究；過度優化可能過度適合歷史數據。"
+        "主回測（上方）仍使用側邊欄當前參數 / "
+        "Scan results are for research; overfitting risk applies. "
+        "Main backtest above uses current sidebar parameters."
+    )
 
 
 def run_portfolio_backtest(
@@ -1099,6 +1235,88 @@ def main():
                 key="channel_period",
                 help="使用前 N 日最高/最低（不含當日）/ Prior N-day high/low excluding current bar",
             )
+        
+        enable_param_scan = False
+        scan_rank_metric = METRIC_SHARPE
+        scan_param_grid = {}
+        
+        if backtest_mode == "單一資產 / Single Asset":
+            st.markdown("---")
+            st.subheader("🔬 參數掃描 / Parameter Scan")
+            st.caption("L1 研究層：網格優化（預設關閉）/ L1 research: grid optimization (off by default)")
+            
+            enable_param_scan = st.checkbox(
+                "啟用參數掃描 / Enable Parameter Scan",
+                value=False,
+                help=(
+                    f"在主要回測後掃描參數網格（最多 {MAX_GRID_COMBINATIONS} 組）/ "
+                    f"After main backtest, sweep parameter grid (max {MAX_GRID_COMBINATIONS})"
+                ),
+            )
+            
+            if enable_param_scan:
+                scan_rank_metric = st.selectbox(
+                    "排名指標 / Rank by",
+                    options=list(RANK_METRIC_OPTIONS),
+                    format_func=metric_label,
+                    index=0,
+                )
+                
+                if strategy_type == STRATEGY_SMA:
+                    st.caption("快線 × 慢線網格（僅 fast < slow）/ Fast × slow grid (fast < slow only)")
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        scan_fast_start = st.number_input("快線起 / Fast from", 5, 200, 10, 5, key="scan_fast_start")
+                        scan_fast_end = st.number_input("快線止 / Fast to", 5, 200, 40, 5, key="scan_fast_end")
+                        scan_fast_step = st.number_input("快線步長 / Fast step", 1, 50, 5, 1, key="scan_fast_step")
+                    with c2:
+                        scan_slow_start = st.number_input("慢線起 / Slow from", 10, 300, 50, 10, key="scan_slow_start")
+                        scan_slow_end = st.number_input("慢線止 / Slow to", 10, 300, 100, 10, key="scan_slow_end")
+                        scan_slow_step = st.number_input("慢線步長 / Slow step", 1, 50, 10, 1, key="scan_slow_step")
+                    scan_param_grid = {
+                        "fast_period": arange_params(scan_fast_start, scan_fast_end, scan_fast_step),
+                        "slow_period": arange_params(scan_slow_start, scan_slow_end, scan_slow_step),
+                    }
+                elif strategy_type == STRATEGY_RSI:
+                    st.caption(
+                        f"週期 × 超賣（超買固定 {int(st.session_state.get('rsi_overbought', 70))}）/ "
+                        "Period × oversold (overbought fixed from sidebar)"
+                    )
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        scan_rsi_p_start = st.number_input("RSI 起 / Period from", 5, 50, 10, 1, key="scan_rsi_p_start")
+                        scan_rsi_p_end = st.number_input("RSI 止 / Period to", 5, 50, 20, 1, key="scan_rsi_p_end")
+                        scan_rsi_p_step = st.number_input("RSI 步長 / Period step", 1, 20, 2, 1, key="scan_rsi_p_step")
+                    with c2:
+                        scan_os_start = st.number_input("超賣起 / OS from", 10, 40, 25, 5, key="scan_os_start")
+                        scan_os_end = st.number_input("超賣止 / OS to", 10, 40, 35, 5, key="scan_os_end")
+                        scan_os_step = st.number_input("超賣步長 / OS step", 1, 10, 5, 1, key="scan_os_step")
+                    scan_param_grid = {
+                        "rsi_period": arange_params(scan_rsi_p_start, scan_rsi_p_end, scan_rsi_p_step),
+                        "rsi_oversold": arange_params(scan_os_start, scan_os_end, scan_os_step),
+                        "rsi_overbought": [int(st.session_state.get("rsi_overbought", 70))],
+                    }
+                elif strategy_type == STRATEGY_DONCHIAN:
+                    st.caption("通道週期一維掃描 / Channel period 1D sweep")
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        scan_ch_start = st.number_input("週期起 / From", 5, 252, 10, 1, key="scan_ch_start")
+                        scan_ch_end = st.number_input("週期止 / To", 5, 252, 40, 1, key="scan_ch_end")
+                        scan_ch_step = st.number_input("步長 / Step", 1, 50, 5, 1, key="scan_ch_step")
+                    scan_param_grid = {
+                        "channel_period": arange_params(scan_ch_start, scan_ch_end, scan_ch_step),
+                    }
+                
+                n_preview = count_valid_combinations(strategy_type, scan_param_grid)
+                if n_preview > MAX_GRID_COMBINATIONS:
+                    st.warning(
+                        f"⚠️ 預覽 {n_preview} 組 > 上限 {MAX_GRID_COMBINATIONS}；請縮小範圍 / "
+                        f"Preview {n_preview} combos exceeds limit {MAX_GRID_COMBINATIONS}"
+                    )
+                elif n_preview == 0:
+                    st.warning("⚠️ 無有效組合 / No valid combinations")
+                else:
+                    st.caption(f"將掃描 {n_preview} 組 / Will scan {n_preview} combinations")
         
         # Research panels only for single asset mode
         show_calendar = False
@@ -2004,6 +2222,20 @@ def main():
                     )
                 else:
                     st.info("在回測期間未執行任何交易 / No trades executed during backtest period")
+                
+                if enable_param_scan and scan_param_grid:
+                    st.markdown("---")
+                    display_parameter_scan_section(
+                        data=data,
+                        strategy_type=strategy_type,
+                        param_grid=scan_param_grid,
+                        rank_metric=scan_rank_metric,
+                        initial_capital=initial_capital,
+                        commission=commission,
+                        slippage=slippage,
+                        position_size=position_size,
+                        theme=st.session_state.theme,
+                    )
             
             except Exception as e:
                 st.error(f"❌ 錯誤 / Error: {str(e)}")
@@ -2033,6 +2265,7 @@ def main():
         - 💰 可自訂佣金、滑點和倉位大小
         - 🔄 支援 Yahoo Finance 線上數據或上傳自己的 CSV
         - 📥 下載交易明細
+        - 🔬 可選參數掃描／網格優化（見 [docs/PARAMETER-SCAN.md](docs/PARAMETER-SCAN.md)）
         """)
 
 
