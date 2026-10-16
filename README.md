@@ -23,6 +23,7 @@
 - ✅ **Phase 3**: 新聞研究面板 / News research panel ([docs](docs/PHASE3-news-panel.md))
 - ✅ **Phase 4**: 財報／商蹤時間線 / Earnings timeline ([docs](docs/PHASE4-earnings-timeline.md))
 - ✅ **Phase 5**: 事件驅動策略規則 / Event-driven strategy rules ([docs](docs/PHASE5-event-driven-rules.md))
+- ✅ **Parameter scan**: 可選參數網格優化（Streamlit；預設關閉，上限 100 組）/ Opt-in grid search ([docs](docs/PARAMETER-SCAN.md))
 
 ### 已完成階段
 
