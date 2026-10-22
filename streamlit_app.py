@@ -38,6 +38,15 @@ from backtester.ticker_presets import (
     get_ticker_description,
 )
 from backtester.portfolio import PortfolioBacktester, calculate_benchmark
+from backtester.report_export import (
+    ReportMetadata,
+    kpi_rows_from_metrics,
+    build_backtest_report_pdf,
+    equity_curve_to_csv_bytes,
+    portfolio_kpi_rows,
+    safe_filename_part,
+    trades_to_csv_bytes,
+)
 from backtester.parameter_scan import (
     MAX_GRID_COMBINATIONS,
     METRIC_MAX_DRAWDOWN,
@@ -422,6 +431,86 @@ def display_parameter_scan_section(
     )
 
 
+def render_backtest_export_section(
+    *,
+    export_key_prefix: str,
+    metadata: ReportMetadata,
+    metrics: Optional[dict] = None,
+    portfolio_metrics=None,
+    spy_return_pct: Optional[float] = None,
+    trades_df: Optional[pd.DataFrame] = None,
+    equity_curve: pd.DataFrame,
+    equity_column: str = "Equity",
+    benchmark_curve: Optional[pd.DataFrame] = None,
+    benchmark_column: Optional[str] = None,
+    benchmark_csv_name: str = "BuyHold",
+    equity_chart_label: str = "Strategy Equity",
+    benchmark_chart_label: str = "Benchmark",
+) -> None:
+    """Download buttons for trades CSV, equity CSV, and PDF summary."""
+    st.markdown("## 📥 報告匯出 / Report Export")
+
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    base = safe_filename_part(metadata.ticker_or_tickers.replace(",", "_"))
+    trades_bytes = trades_to_csv_bytes(trades_df if trades_df is not None else pd.DataFrame())
+    equity_bytes = equity_curve_to_csv_bytes(
+        equity_curve,
+        equity_column=equity_column,
+        benchmark_curve=benchmark_curve,
+        benchmark_column=benchmark_column,
+        benchmark_csv_name=benchmark_csv_name,
+    )
+
+    if metrics is not None:
+        kpi_rows = kpi_rows_from_metrics(metrics)
+    elif portfolio_metrics is not None:
+        kpi_rows = portfolio_kpi_rows(portfolio_metrics, spy_return_pct=spy_return_pct)
+    else:
+        kpi_rows = []
+
+    pdf_bytes, chart_err = build_backtest_report_pdf(
+        metadata=metadata,
+        kpi_rows=kpi_rows,
+        equity_curve=equity_curve,
+        equity_column=equity_column,
+        benchmark_curve=benchmark_curve,
+        benchmark_column=benchmark_column,
+        equity_label=equity_chart_label,
+        benchmark_label=benchmark_chart_label,
+    )
+    if chart_err:
+        st.warning(
+            f"⚠️ PDF 已生成但權益曲線圖片略過：{chart_err} / "
+            f"PDF created without chart image: {chart_err}"
+        )
+
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        st.download_button(
+            label="📄 交易 CSV / Trades CSV",
+            data=trades_bytes,
+            file_name=f"trades_{base}_{stamp}.csv",
+            mime="text/csv",
+            key=f"{export_key_prefix}_trades_csv",
+        )
+    with col_b:
+        st.download_button(
+            label="📈 權益 CSV / Equity CSV",
+            data=equity_bytes,
+            file_name=f"equity_{base}_{stamp}.csv",
+            mime="text/csv",
+            key=f"{export_key_prefix}_equity_csv",
+        )
+    with col_c:
+        st.download_button(
+            label="📑 摘要 PDF / Summary PDF",
+            data=pdf_bytes,
+            file_name=f"backtest_{base}_{stamp}.pdf",
+            mime="application/pdf",
+            key=f"{export_key_prefix}_summary_pdf",
+        )
+
+
 def run_portfolio_backtest(
     portfolio_tickers,
     start_date,
@@ -522,6 +611,38 @@ def run_portfolio_backtest(
                 )
             else:
                 st.metric("SPY 基準", "N/A")
+
+        spy_return_pct = None
+        if not benchmark_curve.empty:
+            benchmark_final = benchmark_curve["BenchmarkEquity"].iloc[-1]
+            spy_return_pct = ((benchmark_final / initial_capital) - 1) * 100
+
+        tickers_label = ", ".join(portfolio_tickers)
+        render_backtest_export_section(
+            export_key_prefix="portfolio_export",
+            metadata=ReportMetadata(
+                mode="portfolio",
+                title_line="Portfolio Backtest / 投資組合回測",
+                ticker_or_tickers=tickers_label,
+                start_date=start_date.strftime("%Y-%m-%d"),
+                end_date=end_date.strftime("%Y-%m-%d"),
+                strategy_name="Equal-weight monthly rebalance / 等權重每月再平衡",
+                strategy_params={"tickers": tickers_label, "count": len(portfolio_tickers)},
+                initial_capital=initial_capital,
+                commission=commission,
+                slippage=None,
+            ),
+            portfolio_metrics=portfolio_metrics,
+            spy_return_pct=spy_return_pct,
+            trades_df=pd.DataFrame(),
+            equity_curve=equity_curve,
+            equity_column="Equity",
+            benchmark_curve=benchmark_curve,
+            benchmark_column="BenchmarkEquity" if not benchmark_curve.empty else None,
+            benchmark_csv_name="SPY_Benchmark",
+            equity_chart_label="Portfolio",
+            benchmark_chart_label="SPY Benchmark",
+        )
         
         st.markdown("---")
         st.markdown("## 📈 權益曲線 / Equity Curve")
@@ -1808,6 +1929,36 @@ def main():
                         "買入持有回報 / Buy & Hold Return",
                         f"{metrics['buy_hold_return_pct']:.2f}%",
                     )
+
+                tpl_id = st.session_state.get("strategy_template_picker", CUSTOM_TEMPLATE_ID)
+                strategy_display = template_label(tpl_id)
+                if tpl_id == CUSTOM_TEMPLATE_ID:
+                    strategy_display = f"{strategy_display} ({strategy_type})"
+
+                render_backtest_export_section(
+                    export_key_prefix="single_export",
+                    metadata=ReportMetadata(
+                        mode="single",
+                        title_line=f"Single-asset backtest / 單一資產回測 — {symbol}",
+                        ticker_or_tickers=symbol,
+                        start_date=data.index.min().strftime("%Y-%m-%d"),
+                        end_date=data.index.max().strftime("%Y-%m-%d"),
+                        strategy_name=strategy_display,
+                        strategy_params=strategy_params,
+                        initial_capital=initial_capital,
+                        commission=commission,
+                        slippage=slippage,
+                    ),
+                    metrics=metrics,
+                    trades_df=engine.get_trades_df(),
+                    equity_curve=equity_curve,
+                    equity_column="Equity",
+                    benchmark_curve=buy_hold_curve,
+                    benchmark_column="BuyHoldEquity" if not buy_hold_curve.empty else None,
+                    benchmark_csv_name="BuyHold",
+                    equity_chart_label="Strategy Equity",
+                    benchmark_chart_label="Buy & Hold",
+                )
             
                 # Educational note in Traditional Chinese
                 st.info(
@@ -2213,13 +2364,6 @@ def main():
                         use_container_width=True,
                     )
                 
-                    csv = trades_df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📥 下載交易記錄 / Download Trades",
-                        data=csv,
-                        file_name=f"trades_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                        mime="text/csv",
-                    )
                 else:
                     st.info("在回測期間未執行任何交易 / No trades executed during backtest period")
                 

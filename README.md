@@ -322,7 +322,7 @@ streamlit run streamlit_app.py
 - 📈 **績效指標**：總回報、CAGR、夏普比率、勝率等
 - 📉 **買入持有基準**：與被動投資策略比較
 - 📋 **交易明細**：完整的交易記錄表格
-- 📥 **下載功能**：匯出交易記錄為 CSV
+- 📥 **報告匯出**：交易 CSV、權益曲線 CSV（含基準）、一頁式 PDF 摘要（含 KPI 與權益圖）— 見 [docs/REPORT-EXPORT.md](docs/REPORT-EXPORT.md)
 - 🔄 **多種數據源**：內建範例、Yahoo Finance、上傳 CSV
 - ⚡ **快速選股（Phase 1）**：預設常用指數/ETF 快速選擇（美股、板塊、港股/亞洲、債券/商品等）
 
@@ -488,7 +488,7 @@ Open your browser to http://localhost:8501 and start backtesting with the intera
 - 📈 Complete performance metrics
 - 📉 Buy-and-hold benchmark comparison
 - 📋 Trade history table
-- 📥 Download results as CSV
+- 📥 Report export: trades CSV, equity curve CSV (with benchmark), one-page PDF summary — see [docs/REPORT-EXPORT.md](docs/REPORT-EXPORT.md)
 - 🔄 Multiple data sources (sample CSV, Yahoo Finance, file upload)
 - ⚡ Quick-select shortcuts (Phase 1): Preset common indices/ETFs for faster backtesting
 
