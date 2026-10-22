@@ -164,9 +164,11 @@ def test_streamlit_app_imports():
         assert hasattr(streamlit_app, 'main')
         assert hasattr(streamlit_app, 'run_portfolio_backtest')
         assert hasattr(streamlit_app, 'display_parameter_scan_section')
+        assert hasattr(streamlit_app, 'render_backtest_export_section')
         assert callable(streamlit_app.main)
         assert callable(streamlit_app.run_portfolio_backtest)
         assert callable(streamlit_app.display_parameter_scan_section)
+        assert callable(streamlit_app.render_backtest_export_section)
         
     except ImportError as e:
         pytest.fail(f"Failed to import streamlit_app: {e}")
