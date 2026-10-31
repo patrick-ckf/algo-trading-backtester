@@ -24,6 +24,7 @@
 - ✅ **Phase 4**: 財報／商蹤時間線 / Earnings timeline ([docs](docs/PHASE4-earnings-timeline.md))
 - ✅ **Phase 5**: 事件驅動策略規則 / Event-driven strategy rules ([docs](docs/PHASE5-event-driven-rules.md))
 - ✅ **Parameter scan**: 可選參數網格優化（Streamlit；預設關閉，上限 100 組）/ Opt-in grid search ([docs](docs/PARAMETER-SCAN.md))
+- ✅ **Phase 6e**: Monte Carlo／Bootstrap 不確定性區間（Streamlit；預設關閉）/ Opt-in bootstrap uncertainty ([docs](docs/PHASE6E-MONTE-CARLO.md))
 
 ### 已完成階段
 
@@ -51,6 +52,11 @@
   - 在已知事件前後阻止買入訊號（可配置黑名單窗口）
   - 經濟事件 + 財報事件黑名單
   - Phase 0 合規：預設關閉，L0 控制回測始終顯示，對照測試
+- **Phase 6e**：Monte Carlo／Bootstrap 不確定性 ✅ → [docs/PHASE6E-MONTE-CARLO.md](docs/PHASE6E-MONTE-CARLO.md)
+  - Opt-in 事後重抽樣（L1 研究層）
+  - 日權益報酬或交易報酬 Bootstrap，可選區塊重抽樣
+  - 百分位表、直方圖、權益區間圖（Plotly 主題適配）
+  - 描述性不確定性說明，非統計檢定或顯著性聲明
 
 ## 內建策略
 
