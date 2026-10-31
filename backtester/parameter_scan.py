@@ -18,12 +18,16 @@ from backtester.engine import BacktestEngine
 from backtester.metrics import PerformanceMetrics, calculate_buy_and_hold
 from backtester.strategy import Strategy
 from backtester.strategy_templates import (
+    STRATEGY_BOLLINGER,
     STRATEGY_DONCHIAN,
+    STRATEGY_MACD,
     STRATEGY_RSI,
     STRATEGY_SMA,
     CUSTOM_TEMPLATE_ID,
 )
+from backtester.strategies.bollinger_mean_reversion import BollingerMeanReversion
 from backtester.strategies.donchian_breakout import DonchianBreakout
+from backtester.strategies.macd_crossover import MACDCrossover
 from backtester.strategies.rsi_mean_reversion import RSIMeanReversion
 from backtester.strategies.sma_crossover import SMACrossover
 
@@ -99,6 +103,26 @@ def iter_param_combinations(
     elif strategy_type == STRATEGY_DONCHIAN:
         for channel in param_grid.get("channel_period", []):
             yield {"channel_period": int(channel)}
+    elif strategy_type == STRATEGY_MACD:
+        fast_vals = param_grid.get("fast_period", [])
+        slow_vals = param_grid.get("slow_period", [])
+        signal_vals = param_grid.get("signal_period", [9])
+        for fast in fast_vals:
+            for slow in slow_vals:
+                if fast < slow:
+                    for signal in signal_vals:
+                        yield {
+                            "fast_period": int(fast),
+                            "slow_period": int(slow),
+                            "signal_period": int(signal),
+                        }
+    elif strategy_type == STRATEGY_BOLLINGER:
+        period_vals = param_grid.get("bb_period", [])
+        std_vals = param_grid.get("bb_std", [])
+        for period in period_vals:
+            for std in std_vals:
+                if std > 0:
+                    yield {"bb_period": int(period), "bb_std": float(std)}
     else:
         return
 
@@ -127,6 +151,10 @@ def strategy_class_for_type(strategy_type: str) -> Type[Strategy]:
         return RSIMeanReversion
     if strategy_type == STRATEGY_DONCHIAN:
         return DonchianBreakout
+    if strategy_type == STRATEGY_MACD:
+        return MACDCrossover
+    if strategy_type == STRATEGY_BOLLINGER:
+        return BollingerMeanReversion
     raise ValueError(f"Unknown strategy type: {strategy_type}")
 
 
@@ -144,6 +172,17 @@ def strategy_kwargs(strategy_type: str, params: Dict[str, int]) -> Dict[str, Any
         }
     if strategy_type == STRATEGY_DONCHIAN:
         return {"channel_period": params["channel_period"]}
+    if strategy_type == STRATEGY_MACD:
+        return {
+            "fast_period": params["fast_period"],
+            "slow_period": params["slow_period"],
+            "signal_period": params["signal_period"],
+        }
+    if strategy_type == STRATEGY_BOLLINGER:
+        return {
+            "bb_period": params["bb_period"],
+            "bb_std": params["bb_std"],
+        }
     raise ValueError(f"Unknown strategy type: {strategy_type}")
 
 
@@ -261,6 +300,10 @@ def pivot_for_heatmap(
             return None
     elif strategy_type == STRATEGY_DONCHIAN:
         return None
+    elif strategy_type == STRATEGY_MACD:
+        x_col, y_col = "fast_period", "slow_period"
+    elif strategy_type == STRATEGY_BOLLINGER:
+        x_col, y_col = "bb_period", "bb_std"
     else:
         return None
 
@@ -380,4 +423,8 @@ def param_columns_for_strategy(strategy_type: str) -> List[str]:
         return ["rsi_period", "rsi_oversold", "rsi_overbought"]
     if strategy_type == STRATEGY_DONCHIAN:
         return ["channel_period"]
+    if strategy_type == STRATEGY_MACD:
+        return ["fast_period", "slow_period", "signal_period"]
+    if strategy_type == STRATEGY_BOLLINGER:
+        return ["bb_period", "bb_std"]
     return []

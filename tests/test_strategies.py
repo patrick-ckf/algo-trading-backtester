@@ -9,6 +9,8 @@ import numpy as np
 from backtester.strategies.sma_crossover import SMACrossover
 from backtester.strategies.rsi_mean_reversion import RSIMeanReversion
 from backtester.strategies.donchian_breakout import DonchianBreakout
+from backtester.strategies.macd_crossover import MACDCrossover
+from backtester.strategies.bollinger_mean_reversion import BollingerMeanReversion
 
 
 def create_test_data_with_trend(bars: int = 100, trend: str = "up") -> pd.DataFrame:
@@ -291,6 +293,85 @@ def test_sma_no_signals_in_flat_market():
     
     # Flat market should produce very few or no signals
     assert len(signals) <= 2  # Allow for noise at boundaries
+
+
+def test_macd_initialization():
+    strategy = MACDCrossover(fast_period=12, slow_period=26, signal_period=9)
+    assert strategy.fast_period == 12
+    assert strategy.signal_period == 9
+    assert "MACD_12_26_9" in strategy.name
+
+
+def test_macd_setup_calculates_lines():
+    data = create_test_data_with_trend(bars=80, trend="up")
+    strategy = MACDCrossover(fast_period=5, slow_period=15, signal_period=5)
+    strategy.setup(data)
+    assert strategy.macd_line is not None
+    assert strategy.signal_line is not None
+    assert len(strategy.macd_line) == len(data)
+
+
+def test_macd_can_generate_crossover_signal():
+    dates = pd.date_range("2020-01-01", periods=120, freq="D")
+    close = np.concatenate([np.full(40, 100), np.linspace(100, 160, 80)])
+    data = pd.DataFrame(
+        {
+            "Open": close * 0.99,
+            "High": close * 1.01,
+            "Low": close * 0.98,
+            "Close": close,
+            "Volume": 1000000,
+        },
+        index=dates,
+    )
+    data.index.name = "Date"
+    strategy = MACDCrossover(fast_period=5, slow_period=20, signal_period=5)
+    strategy.setup(data)
+    signals = [strategy.on_bar(i, data.iloc[i]) for i in range(len(data))]
+    assert "BUY" in signals or "SELL" in signals
+
+
+def test_bollinger_initialization():
+    strategy = BollingerMeanReversion(bb_period=20, bb_std=2.0)
+    assert strategy.bb_period == 20
+    assert strategy.bb_std == 2.0
+
+
+def test_bollinger_setup_calculates_bands():
+    data = create_test_data_with_trend(bars=60, trend="up")
+    strategy = BollingerMeanReversion(bb_period=10, bb_std=2.0)
+    strategy.setup(data)
+    assert strategy.middle_band is not None
+    assert strategy.lower_band is not None
+    assert len(strategy.upper_band) == len(data)
+
+
+def test_bollinger_hold_during_warmup():
+    data = create_test_data_with_trend(bars=50, trend="up")
+    strategy = BollingerMeanReversion(bb_period=20, bb_std=2.0)
+    strategy.setup(data)
+    for i in range(strategy.bb_period):
+        assert strategy.on_bar(i, data.iloc[i]) == "HOLD"
+
+
+def test_bollinger_can_generate_mean_reversion_signal():
+    dates = pd.date_range("2020-01-01", periods=80, freq="D")
+    close = np.concatenate([np.full(30, 100), np.linspace(100, 70, 20), np.linspace(70, 100, 30)])
+    data = pd.DataFrame(
+        {
+            "Open": close * 0.99,
+            "High": close * 1.02,
+            "Low": close * 0.97,
+            "Close": close,
+            "Volume": 1000000,
+        },
+        index=dates,
+    )
+    data.index.name = "Date"
+    strategy = BollingerMeanReversion(bb_period=10, bb_std=1.5)
+    strategy.setup(data)
+    signals = [strategy.on_bar(i, data.iloc[i]) for i in range(len(data))]
+    assert "BUY" in signals or "SELL" in signals
 
 
 if __name__ == "__main__":

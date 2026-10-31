@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional
 STRATEGY_SMA = "SMA Crossover"
 STRATEGY_RSI = "RSI Mean Reversion"
 STRATEGY_DONCHIAN = "Donchian Breakout"
+STRATEGY_MACD = "MACD Crossover"
+STRATEGY_BOLLINGER = "Bollinger Mean Reversion"
 
 CUSTOM_TEMPLATE_ID = "custom"
 CUSTOM_TEMPLATE_LABEL = "自訂 / Custom"
@@ -56,6 +58,20 @@ STRATEGY_TEMPLATES: List[StrategyTemplate] = [
         strategy_type=STRATEGY_DONCHIAN,
         params={"channel_period": 20},
         description="N 日高低突破 / Breakout on prior N-day high/low",
+    ),
+    StrategyTemplate(
+        id="macd_classic",
+        label="MACD 交叉 12/26/9 / MACD Crossover 12/26/9",
+        strategy_type=STRATEGY_MACD,
+        params={"fast_period": 12, "slow_period": 26, "signal_period": 9},
+        description="經典 MACD 金叉死叉 / Classic MACD line vs signal crossovers",
+    ),
+    StrategyTemplate(
+        id="bollinger_20_2",
+        label="布林均值回歸 20,2σ / Bollinger Mean Reversion 20, 2σ",
+        strategy_type=STRATEGY_BOLLINGER,
+        params={"bb_period": 20, "bb_std": 2.0},
+        description="下軌買入、中軌賣出 / Buy lower band, exit at middle band",
     ),
 ]
 
