@@ -7,7 +7,121 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-from backtester.portfolio import PortfolioBacktester, calculate_benchmark
+from backtester.portfolio import (
+    PortfolioBacktester,
+    calculate_benchmark,
+    normalize_weights,
+    equal_weights,
+)
+
+
+def test_normalize_weights_validation():
+    """Weight normalization validates tickers and negative values."""
+    tickers = ["SPY", "QQQ"]
+    assert normalize_weights({"SPY": 60, "QQQ": 40}, tickers) == {"SPY": 0.6, "QQQ": 0.4}
+
+    with pytest.raises(ValueError, match="Missing weight"):
+        normalize_weights({"SPY": 100}, tickers)
+
+    with pytest.raises(ValueError, match="non-negative"):
+        normalize_weights({"SPY": -1, "QQQ": 2}, tickers)
+
+    with pytest.raises(ValueError, match="positive"):
+        normalize_weights({"SPY": 0, "QQQ": 0}, tickers)
+
+
+def test_custom_weights_rebalance():
+    """Custom 70/30 weights are applied on rebalance dates."""
+    tickers = ["SPY", "QQQ"]
+    portfolio = PortfolioBacktester(
+        tickers=tickers,
+        start_date="2022-01-01",
+        end_date="2022-03-31",
+        initial_capital=100000.0,
+        commission=0.0,
+        target_weights={"SPY": 0.7, "QQQ": 0.3},
+        rebalance_frequency="monthly",
+    )
+
+    portfolio.load_data()
+    equity_curve = portfolio.run()
+    rebalance_dates = portfolio._get_rebalance_dates()
+
+    for date in rebalance_dates[:2]:
+        date_naive = pd.Timestamp(date.date())
+        matching_rows = equity_curve.index[equity_curve.index.date == date_naive.date()]
+        if len(matching_rows) == 0:
+            continue
+        row = equity_curve.loc[matching_rows[0]]
+        total_equity = row["Equity"]
+        if total_equity <= 0:
+            continue
+        assert abs(row["SPY"] / total_equity - 0.7) < 0.015
+        assert abs(row["QQQ"] / total_equity - 0.3) < 0.015
+
+
+def test_never_rebalance_fewer_dates_than_monthly():
+    """Buy-and-hold uses a single rebalance at the start."""
+    tickers = ["SPY", "QQQ"]
+    monthly = PortfolioBacktester(
+        tickers=tickers,
+        start_date="2022-01-01",
+        end_date="2022-06-30",
+        initial_capital=100000.0,
+        commission=0.0,
+        rebalance_frequency="monthly",
+    )
+    never = PortfolioBacktester(
+        tickers=tickers,
+        start_date="2022-01-01",
+        end_date="2022-06-30",
+        initial_capital=100000.0,
+        commission=0.0,
+        rebalance_frequency="never",
+    )
+    monthly.load_data()
+    never.load_data()
+    assert len(never._get_rebalance_dates()) == 1
+    assert len(monthly._get_rebalance_dates()) > len(never._get_rebalance_dates())
+
+
+def test_inverse_volatility_weights_sum_to_one():
+    """Inverse-vol weights are positive and sum to 1."""
+    tickers = ["SPY", "QQQ"]
+    portfolio = PortfolioBacktester(
+        tickers=tickers,
+        start_date="2022-01-01",
+        end_date="2022-06-30",
+    )
+    portfolio.load_data()
+    portfolio.apply_inverse_volatility_weights()
+    weights = portfolio.get_target_weights()
+    assert abs(sum(weights.values()) - 1.0) < 1e-6
+    assert all(v > 0 for v in weights.values())
+
+
+def test_weekly_rebalance_dates_increase():
+    """Weekly schedule has more rebalance dates than quarterly over same range."""
+    tickers = ["SPY", "QQQ"]
+    weekly = PortfolioBacktester(
+        tickers=tickers,
+        start_date="2022-01-01",
+        end_date="2022-06-30",
+        rebalance_frequency="weekly",
+    )
+    quarterly = PortfolioBacktester(
+        tickers=tickers,
+        start_date="2022-01-01",
+        end_date="2022-06-30",
+        rebalance_frequency="quarterly",
+    )
+    weekly.load_data()
+    quarterly.load_data()
+    assert len(weekly._get_rebalance_dates()) > len(quarterly._get_rebalance_dates())
+
+
+def test_equal_weights_helper():
+    assert equal_weights(["A", "B"]) == {"A": 0.5, "B": 0.5}
 
 
 def test_portfolio_initialization():
