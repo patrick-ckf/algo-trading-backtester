@@ -26,6 +26,7 @@
 - ✅ **Parameter scan**: 可選參數網格優化（Streamlit；預設關閉，上限 100 組）/ Opt-in grid search ([docs](docs/PARAMETER-SCAN.md))
 - ✅ **Phase 6a**: MACD 交叉與布林均值回歸策略模板 / MACD & Bollinger strategy templates (Streamlit presets + L0 strategies)
 - ✅ **Phase 6b — Walk-forward OOS**: 可選步進樣本外驗證（Streamlit；預設關閉）/ Opt-in walk-forward validation ([docs](docs/WALK-FORWARD.md))
+- ✅ **Phase 6c — Cost sensitivity**: 可選佣金／滑點敏感度掃描（Streamlit；預設關閉，上限 100 組）/ Opt-in friction sensitivity ([docs](docs/COST-SENSITIVITY.md))
 
 ### 已完成階段
 
