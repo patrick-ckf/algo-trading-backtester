@@ -220,6 +220,7 @@ def run_single_backtest_metrics(
     metrics = calc.calculate_all()
     row = {**params}
     row["trade_count"] = metrics.get("trade_count", 0)
+    row["win_rate_pct"] = metrics.get("win_rate_pct", 0.0)
     row[METRIC_SHARPE] = metrics.get(METRIC_SHARPE, float("nan"))
     row[METRIC_TOTAL_RETURN] = metrics.get(METRIC_TOTAL_RETURN, float("nan"))
     row[METRIC_MAX_DRAWDOWN] = metrics.get(METRIC_MAX_DRAWDOWN, float("nan"))

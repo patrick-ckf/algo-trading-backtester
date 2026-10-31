@@ -25,6 +25,7 @@
 - ✅ **Phase 5**: 事件驅動策略規則 / Event-driven strategy rules ([docs](docs/PHASE5-event-driven-rules.md))
 - ✅ **Parameter scan**: 可選參數網格優化（Streamlit；預設關閉，上限 100 組）/ Opt-in grid search ([docs](docs/PARAMETER-SCAN.md))
 - ✅ **Phase 6a**: MACD 交叉與布林均值回歸策略模板 / MACD & Bollinger strategy templates (Streamlit presets + L0 strategies)
+- ✅ **Phase 6b — Walk-forward OOS**: 可選步進樣本外驗證（Streamlit；預設關閉）/ Opt-in walk-forward validation ([docs](docs/WALK-FORWARD.md))
 
 ### 已完成階段
 
