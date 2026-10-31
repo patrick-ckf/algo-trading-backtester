@@ -2,14 +2,40 @@
 
 ## Overview
 
-The portfolio backtest feature allows users to test a multi-asset portfolio strategy with equal weighting and monthly rebalancing. This is an **opt-in feature** that coexists with the existing single-asset backtest functionality.
+The portfolio backtest feature allows users to test a multi-asset portfolio strategy. **Defaults** remain equal weighting and monthly rebalancing; **Phase 6d** adds opt-in custom weights and rebalance schedules. This is an **opt-in feature** that coexists with the existing single-asset backtest functionality.
+
+## Phase 6d: Advanced portfolio controls
+
+Available in Streamlit under **Advanced Portfolio** (collapsed by default):
+
+| Option | Default | Notes |
+|--------|---------|--------|
+| Rebalance frequency | Monthly | Weekly, quarterly, or buy-and-hold (`never`) |
+| Weight preset | Equal | Optional inverse-volatility (OHLCV closes only) or custom % per ticker |
+| Validation | — | Custom weights normalized to 100%; clear errors for missing/invalid inputs |
+
+Programmatic example:
+
+```python
+portfolio = PortfolioBacktester(
+    tickers=["SPY", "QQQ"],
+    start_date="2020-01-01",
+    end_date="2023-12-31",
+    target_weights={"SPY": 0.7, "QQQ": 0.3},
+    rebalance_frequency="quarterly",
+)
+portfolio.load_data()
+equity_curve = portfolio.run()
+```
+
+L0 portfolio returns use aligned **Close** prices only; L1 overlays (calendar, news, etc.) stay disabled in portfolio mode.
 
 ## Features
 
 ### Portfolio Configuration
 - Select 2-5 tickers from Yahoo Finance
-- Equal-weight allocation (each asset gets 1/N of capital)
-- Monthly rebalancing on the first trading day of each month
+- Default: equal-weight allocation, monthly rebalancing on the first trading day of each month in the aligned series
+- Optional custom weights (normalized to 100%) and rebalance frequency (weekly, quarterly, buy-and-hold)
 - Automatic timezone handling for different trading calendars
 
 ### Performance Metrics
@@ -43,8 +69,9 @@ The portfolio backtest feature allows users to test a multi-asset portfolio stra
    ```
 
 2. In the sidebar:
-   - Select "Multi-Asset Portfolio" mode
+   - Select "Portfolio" mode
    - Choose 2-5 tickers (default: SPY, QQQ)
+   - Optionally expand **Advanced Portfolio** for custom weights / rebalance frequency
    - Set start and end dates
    - Configure initial capital and commission rate
    - Click "Run Backtest"
@@ -104,9 +131,9 @@ benchmark = calculate_benchmark(
 - Aligns to common date range where all assets have data
 
 ### Rebalancing Logic
-- Identifies first trading day of each month
-- Calculates target value per asset (total equity / N)
-- Rebalances all assets simultaneously
+- Schedules: monthly (default), weekly, quarterly, or single initial allocation (`never`)
+- Uses the first trading day of each period in the aligned date index
+- Rebalances to target weights (equal or custom / inverse-vol)
 - Applies commission costs to each rebalance trade
 
 ### Timezone Handling
@@ -123,12 +150,10 @@ benchmark = calculate_benchmark(
 ## Constraints and Limitations
 
 ### Current Limitations
-1. **Equal weighting only**: No custom weight allocation
-2. **Monthly rebalancing only**: No custom rebalance frequency
-3. **Yahoo Finance only**: No CSV upload or custom data sources
-4. **No short positions**: Long-only portfolio
-5. **No leverage**: 100% capital allocation across assets
-6. **No strategy signals**: Buy-and-hold only (no tactical allocation)
+1. **Yahoo Finance only**: No CSV upload or custom data sources
+2. **No short positions**: Long-only portfolio
+3. **No leverage**: 100% capital allocation across assets
+4. **No strategy signals**: Buy-and-hold allocation (no tactical signals from L1 overlays)
 
 ### Design Decisions
 - **Single-asset features disabled**: Economic calendar, news, earnings, and Phase 5 event-driven rules are single-asset features and are hidden in portfolio mode

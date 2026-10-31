@@ -8,7 +8,7 @@
 - 🎯 **策略 API**：簡單的基礎策略類，易於擴展
 - 🔄 **回測引擎**：支援多頭/平倉策略，含佣金和滑點模擬
 - 📈 **績效指標**：總回報、CAGR、最大回撤、夏普比率、勝率等
-- 💼 **投資組合回測**：多資產投資組合（2-5 個資產）、等權重配置、每月重新平衡
+- 💼 **投資組合回測**：多資產投資組合（2-5 個資產）、預設等權重每月重新平衡；可選自訂權重與再平衡頻率（Phase 6d）
 - 💻 **命令行界面**：開箱即用的 CLI 工具
 - ✅ **單元測試**：確保核心功能正確性
 
@@ -24,6 +24,7 @@
 - ✅ **Phase 4**: 財報／商蹤時間線 / Earnings timeline ([docs](docs/PHASE4-earnings-timeline.md))
 - ✅ **Phase 5**: 事件驅動策略規則 / Event-driven strategy rules ([docs](docs/PHASE5-event-driven-rules.md))
 - ✅ **Parameter scan**: 可選參數網格優化（Streamlit；預設關閉，上限 100 組）/ Opt-in grid search ([docs](docs/PARAMETER-SCAN.md))
+- ✅ **Phase 6d**: 投資組合進階控制（自訂權重 + 再平衡頻率）/ Advanced portfolio controls ([docs](docs/PORTFOLIO-BACKTEST.md#phase-6d-advanced-portfolio-controls))
 
 ### 已完成階段
 
@@ -62,7 +63,8 @@
 **Streamlit 策略模板 / Strategy templates**（側邊欄「策略模板」）：雙均線 20/50（預設）、長趨勢 50/200、RSI 均值回歸、唐奇安 20 日，以及「自訂」手動參數。定義見 `backtester/strategy_templates.py`。
 
 ### 投資組合策略
-1. **等權重投資組合**：2-5 個資產、每月重新平衡、與 SPY 基準比較
+1. **等權重投資組合（預設）**：2-5 個資產、每月重新平衡、與 SPY 基準比較
+2. **進階選項（Phase 6d，可選）**：自訂權重、逆波動率預設、再平衡頻率（每週／每季／不再平衡）
 
 ## 快速開始
 
