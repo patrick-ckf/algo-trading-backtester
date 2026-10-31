@@ -2,7 +2,9 @@
 
 from backtester.strategy_templates import (
     CUSTOM_TEMPLATE_ID,
+    STRATEGY_BOLLINGER,
     STRATEGY_DONCHIAN,
+    STRATEGY_MACD,
     STRATEGY_RSI,
     STRATEGY_SMA,
     apply_template_params,
@@ -50,3 +52,14 @@ def test_long_sma_and_donchian_presets():
     donchian = get_strategy_template("donchian_20")
     assert donchian.strategy_type == STRATEGY_DONCHIAN
     assert donchian.params["channel_period"] == 20
+
+
+def test_phase_6a_macd_and_bollinger_presets():
+    macd = get_strategy_template("macd_classic")
+    assert macd.strategy_type == STRATEGY_MACD
+    assert macd.params == {"fast_period": 12, "slow_period": 26, "signal_period": 9}
+
+    bb = get_strategy_template("bollinger_20_2")
+    assert bb.strategy_type == STRATEGY_BOLLINGER
+    assert bb.params["bb_period"] == 20
+    assert bb.params["bb_std"] == 2.0

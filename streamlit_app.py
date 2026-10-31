@@ -17,10 +17,14 @@ from backtester.metrics import PerformanceMetrics, calculate_buy_and_hold
 from backtester.strategies.sma_crossover import SMACrossover
 from backtester.strategies.rsi_mean_reversion import RSIMeanReversion
 from backtester.strategies.donchian_breakout import DonchianBreakout
+from backtester.strategies.macd_crossover import MACDCrossover
+from backtester.strategies.bollinger_mean_reversion import BollingerMeanReversion
 from backtester.strategy_templates import (
     STRATEGY_SMA,
     STRATEGY_RSI,
     STRATEGY_DONCHIAN,
+    STRATEGY_MACD,
+    STRATEGY_BOLLINGER,
     CUSTOM_TEMPLATE_ID,
     apply_template_params,
     default_template_id,
@@ -389,6 +393,11 @@ def display_parameter_scan_section(
             plot_scan_bar_1d(ranked, "channel_period", rank_metric, theme=theme),
             use_container_width=True,
         )
+    elif strategy_type == STRATEGY_MACD and pivot_info is None:
+        st.plotly_chart(
+            plot_scan_bar_1d(ranked, "signal_period", rank_metric, theme=theme),
+            use_container_width=True,
+        )
 
     display_cols = (
         ["rank"]
@@ -413,7 +422,10 @@ def display_parameter_scan_section(
     for _, row in ranked.iterrows():
         parts = [f"#{int(row['rank'])}"]
         for col in param_columns_for_strategy(strategy_type):
-            parts.append(f"{col}={int(row[col])}")
+            if col == "bb_std":
+                parts.append(f"{col}={float(row[col]):g}")
+            else:
+                parts.append(f"{col}={int(row[col])}")
         parts.append(f"{metric_label(rank_metric)}={row[rank_metric]:.3f}")
         option_labels.append(" | ".join(parts))
 
@@ -429,10 +441,12 @@ def display_parameter_scan_section(
     selected_row = ranked.iloc[selected_idx]
 
     if st.button("✅ 套用並更新側邊欄 / Apply to Sidebar", key="param_scan_apply_btn"):
-        params = {
-            col: int(selected_row[col])
-            for col in param_columns_for_strategy(strategy_type)
-        }
+        params = {}
+        for col in param_columns_for_strategy(strategy_type):
+            if col == "bb_std":
+                params[col] = float(selected_row[col])
+            else:
+                params[col] = int(selected_row[col])
         apply_params_to_session(st.session_state, strategy_type, params)
         st.success(
             "已套用參數（模板已切為「自訂」）。請再次點擊「運行回測」查看結果 / "
@@ -1291,7 +1305,13 @@ def main():
             else:
                 strategy_type = st.selectbox(
                     "策略 / Strategy",
-                    [STRATEGY_SMA, STRATEGY_RSI, STRATEGY_DONCHIAN],
+                    [
+                        STRATEGY_SMA,
+                        STRATEGY_RSI,
+                        STRATEGY_DONCHIAN,
+                        STRATEGY_MACD,
+                        STRATEGY_BOLLINGER,
+                    ],
                     key="strategy_type",
                     help="選擇交易策略 / Select trading strategy",
                 )
@@ -1516,6 +1536,54 @@ def main():
                 key="channel_period",
                 help="使用前 N 日最高/最低（不含當日）/ Prior N-day high/low excluding current bar",
             )
+        elif backtest_mode == "單一資產 / Single Asset" and strategy_type == STRATEGY_MACD:
+            if "fast_period" not in st.session_state:
+                st.session_state.fast_period = 12
+            if "slow_period" not in st.session_state:
+                st.session_state.slow_period = 26
+            if "signal_period" not in st.session_state:
+                st.session_state.signal_period = 9
+            st.number_input(
+                "快 EMA 週期 / Fast EMA Period",
+                min_value=2,
+                max_value=100,
+                step=1,
+                key="fast_period",
+            )
+            st.number_input(
+                "慢 EMA 週期 / Slow EMA Period",
+                min_value=5,
+                max_value=200,
+                step=1,
+                key="slow_period",
+            )
+            st.number_input(
+                "信號線週期 / Signal Period",
+                min_value=2,
+                max_value=50,
+                step=1,
+                key="signal_period",
+            )
+        elif backtest_mode == "單一資產 / Single Asset" and strategy_type == STRATEGY_BOLLINGER:
+            if "bb_period" not in st.session_state:
+                st.session_state.bb_period = 20
+            if "bb_std" not in st.session_state:
+                st.session_state.bb_std = 2.0
+            st.number_input(
+                "布林週期 / BB Window",
+                min_value=5,
+                max_value=252,
+                step=1,
+                key="bb_period",
+            )
+            st.number_input(
+                "標準差倍數 / Std Dev Multiplier",
+                min_value=0.5,
+                max_value=4.0,
+                step=0.5,
+                format="%.1f",
+                key="bb_std",
+            )
         
         enable_param_scan = False
         scan_rank_metric = METRIC_SHARPE
@@ -1592,6 +1660,73 @@ def main():
                         scan_ch_step = st.number_input("步長 / Step", 1, 50, 5, 1, key="scan_ch_step")
                     scan_param_grid = {
                         "channel_period": arange_params(scan_ch_start, scan_ch_end, scan_ch_step),
+                    }
+                elif strategy_type == STRATEGY_MACD:
+                    st.caption(
+                        f"快 × 慢網格（信號固定 {int(st.session_state.get('signal_period', 9))}）/ "
+                        "Fast × slow grid (signal fixed from sidebar)"
+                    )
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        scan_macd_fast_start = st.number_input(
+                            "快線起 / Fast from", 2, 100, 8, 1, key="scan_macd_fast_start"
+                        )
+                        scan_macd_fast_end = st.number_input(
+                            "快線止 / Fast to", 2, 100, 16, 1, key="scan_macd_fast_end"
+                        )
+                        scan_macd_fast_step = st.number_input(
+                            "快線步長 / Fast step", 1, 20, 2, 1, key="scan_macd_fast_step"
+                        )
+                    with c2:
+                        scan_macd_slow_start = st.number_input(
+                            "慢線起 / Slow from", 5, 200, 20, 1, key="scan_macd_slow_start"
+                        )
+                        scan_macd_slow_end = st.number_input(
+                            "慢線止 / Slow to", 5, 200, 32, 1, key="scan_macd_slow_end"
+                        )
+                        scan_macd_slow_step = st.number_input(
+                            "慢線步長 / Slow step", 1, 20, 2, 1, key="scan_macd_slow_step"
+                        )
+                    scan_param_grid = {
+                        "fast_period": arange_params(
+                            scan_macd_fast_start, scan_macd_fast_end, scan_macd_fast_step
+                        ),
+                        "slow_period": arange_params(
+                            scan_macd_slow_start, scan_macd_slow_end, scan_macd_slow_step
+                        ),
+                        "signal_period": [int(st.session_state.get("signal_period", 9))],
+                    }
+                elif strategy_type == STRATEGY_BOLLINGER:
+                    st.caption("週期 × 標準差倍數 / Window × std-dev multiplier")
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        scan_bb_p_start = st.number_input(
+                            "週期起 / Period from", 5, 252, 10, 1, key="scan_bb_p_start"
+                        )
+                        scan_bb_p_end = st.number_input(
+                            "週期止 / Period to", 5, 252, 30, 1, key="scan_bb_p_end"
+                        )
+                        scan_bb_p_step = st.number_input(
+                            "週期步長 / Period step", 1, 50, 5, 1, key="scan_bb_p_step"
+                        )
+                    with c2:
+                        scan_bb_std_start = st.number_input(
+                            "σ 起 / Std from", 1, 4, 1, 1, key="scan_bb_std_start"
+                        )
+                        scan_bb_std_end = st.number_input(
+                            "σ 止 / Std to", 1, 4, 3, 1, key="scan_bb_std_end"
+                        )
+                        scan_bb_std_step = st.number_input(
+                            "σ 步長 / Std step", 1, 2, 1, 1, key="scan_bb_std_step"
+                        )
+                    scan_param_grid = {
+                        "bb_period": arange_params(scan_bb_p_start, scan_bb_p_end, scan_bb_p_step),
+                        "bb_std": [
+                            float(x)
+                            for x in arange_params(
+                                scan_bb_std_start, scan_bb_std_end, scan_bb_std_step
+                            )
+                        ],
                     }
                 
                 n_preview = count_valid_combinations(strategy_type, scan_param_grid)
@@ -1733,6 +1868,22 @@ def main():
                         elif strategy_type == STRATEGY_DONCHIAN:
                             wf_param_grid = {
                                 "channel_period": arange_params(10, 30, 5),
+                            }
+                        elif strategy_type == STRATEGY_MACD:
+                            wf_param_grid = {
+                                "fast_period": arange_params(8, 16, 2),
+                                "slow_period": arange_params(20, 32, 2),
+                                "signal_period": [
+                                    int(st.session_state.get("signal_period", 9))
+                                ],
+                            }
+                        elif strategy_type == STRATEGY_BOLLINGER:
+                            wf_param_grid = {
+                                "bb_period": arange_params(10, 30, 5),
+                                "bb_std": [
+                                    float(x)
+                                    for x in arange_params(1, 3, 1)
+                                ],
                             }
 
                     n_wf_grid = count_valid_combinations(strategy_type, wf_param_grid)
@@ -2026,12 +2177,27 @@ def main():
                             "oversold": rsi_oversold,
                             "overbought": rsi_overbought,
                         }
-                    else:
+                    elif strategy_type == STRATEGY_DONCHIAN:
                         strategy_class = DonchianBreakout
                         strategy_params = {
                             "channel_period": int(channel_period),
                         }
-                    
+                    elif strategy_type == STRATEGY_MACD:
+                        strategy_class = MACDCrossover
+                        strategy_params = {
+                            "fast_period": int(st.session_state["fast_period"]),
+                            "slow_period": int(st.session_state["slow_period"]),
+                            "signal_period": int(st.session_state["signal_period"]),
+                        }
+                    elif strategy_type == STRATEGY_BOLLINGER:
+                        strategy_class = BollingerMeanReversion
+                        strategy_params = {
+                            "bb_period": int(st.session_state["bb_period"]),
+                            "bb_std": float(st.session_state["bb_std"]),
+                        }
+                    else:
+                        st.error(f"未知策略 / Unknown strategy: {strategy_type}")
+                        return
                     # Phase 5: Run control vs event-aware comparison if enabled
                     if enable_phase5:
                         # Configure event rules
@@ -2710,6 +2876,9 @@ def main():
                         rsi_oversold=int(st.session_state.get("rsi_oversold", 30)),
                         rsi_overbought=int(st.session_state.get("rsi_overbought", 70)),
                         channel_period=int(st.session_state.get("channel_period", 20)),
+                        signal_period=int(st.session_state.get("signal_period", 9)),
+                        bb_period=int(st.session_state.get("bb_period", 20)),
+                        bb_std=float(st.session_state.get("bb_std", 2.0)),
                     )
                     display_walk_forward_section(
                         data=data,

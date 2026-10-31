@@ -24,7 +24,13 @@ from backtester.parameter_scan import (
     run_parameter_grid,
     validate_grid_size,
 )
-from backtester.strategy_templates import STRATEGY_DONCHIAN, STRATEGY_RSI, STRATEGY_SMA
+from backtester.strategy_templates import (
+    STRATEGY_BOLLINGER,
+    STRATEGY_DONCHIAN,
+    STRATEGY_MACD,
+    STRATEGY_RSI,
+    STRATEGY_SMA,
+)
 
 # Streamlit Cloud: cap folds and per-fold grid work (documented in docs/WALK-FORWARD.md).
 MAX_WALK_FORWARD_FOLDS = 24
@@ -196,7 +202,10 @@ def sidebar_fixed_params(
     rsi_oversold: int,
     rsi_overbought: int,
     channel_period: int,
-) -> Dict[str, int]:
+    signal_period: int = 9,
+    bb_period: int = 20,
+    bb_std: float = 2.0,
+) -> Dict[str, Any]:
     """Map sidebar strategy fields to parameter_scan grid keys."""
     if strategy_type == STRATEGY_SMA:
         return {"fast_period": int(fast_period), "slow_period": int(slow_period)}
@@ -208,6 +217,14 @@ def sidebar_fixed_params(
         }
     if strategy_type == STRATEGY_DONCHIAN:
         return {"channel_period": int(channel_period)}
+    if strategy_type == STRATEGY_MACD:
+        return {
+            "fast_period": int(fast_period),
+            "slow_period": int(slow_period),
+            "signal_period": int(signal_period),
+        }
+    if strategy_type == STRATEGY_BOLLINGER:
+        return {"bb_period": int(bb_period), "bb_std": float(bb_std)}
     return {}
 
 

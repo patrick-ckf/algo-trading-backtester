@@ -25,6 +25,10 @@ Portfolio mode, Phase 5, research overlays, and the main equity chart are unaffe
 | Anchored | Train window grows from the start; test window rolls forward |
 | Stitched OOS equity | Test-window equity segments chained with compounding capital (visual only) |
 
+## Supported strategies
+
+Same L0 strategy types as parameter scan: SMA, RSI, Donchian, MACD (Phase 6a), and Bollinger (Phase 6a). Optimize mode uses the parameter-scan grid when enabled, or compact defaults per strategy.
+
 ## Interpretation
 
 This tool is for **robustness checks**, not statistical significance. OOS metrics can still overfit if the grid or strategy family is too flexible.
