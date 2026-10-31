@@ -41,7 +41,12 @@ from backtester.ticker_presets import (
     is_separator,
     get_ticker_description,
 )
-from backtester.portfolio import PortfolioBacktester, calculate_benchmark
+from backtester.portfolio import (
+    PortfolioBacktester,
+    calculate_benchmark,
+    normalize_weights,
+    REBALANCE_FREQUENCIES,
+)
 from backtester.report_export import (
     ReportMetadata,
     kpi_rows_from_metrics,
@@ -821,13 +826,41 @@ def render_backtest_export_section(
         )
 
 
+_PORTFOLIO_REBALANCE_LABELS = {
+    "monthly": "每月（首個交易日）/ Monthly (1st trading day)",
+    "weekly": "每週（首個交易日）/ Weekly (1st trading day)",
+    "quarterly": "每季（首個交易日）/ Quarterly (1st trading day)",
+    "never": "不再平衡（買入持有）/ Buy-and-hold (no rebalance)",
+}
+
+
+def _portfolio_strategy_description(
+    rebalance_frequency: str,
+    target_weights: dict,
+    advanced_enabled: bool,
+) -> str:
+    if not advanced_enabled:
+        return "Equal-weight monthly rebalance / 等權重每月再平衡"
+    freq_label = _PORTFOLIO_REBALANCE_LABELS.get(
+        rebalance_frequency, rebalance_frequency
+    )
+    weight_parts = ", ".join(
+        f"{t} {target_weights[t] * 100:.1f}%" for t in sorted(target_weights)
+    )
+    return (
+        f"Custom weights ({weight_parts}); {freq_label} / "
+        f"自訂權重（{weight_parts}）；{freq_label}"
+    )
+
+
 def run_portfolio_backtest(
     portfolio_tickers,
     start_date,
     end_date,
     initial_capital,
     commission,
-    theme
+    theme,
+    portfolio_options=None,
 ):
     """
     Execute portfolio backtest and display results.
@@ -838,6 +871,34 @@ def run_portfolio_backtest(
         if not portfolio_tickers or not (2 <= len(portfolio_tickers) <= 5):
             st.error("⚠️ 請選擇 2 到 5 個資產 / Please select 2 to 5 assets")
             return
+
+        advanced_enabled = bool(portfolio_options and portfolio_options.get("enabled"))
+        rebalance_frequency = "monthly"
+        weight_preset = "equal"
+        custom_weights = None
+
+        if advanced_enabled:
+            rebalance_frequency = portfolio_options.get("rebalance_frequency", "monthly")
+            if rebalance_frequency not in REBALANCE_FREQUENCIES:
+                st.error(
+                    "⚠️ 無效的再平衡頻率 / Invalid rebalance frequency: "
+                    f"{rebalance_frequency}"
+                )
+                return
+            weight_preset = portfolio_options.get("weight_preset", "equal")
+            custom_weights = portfolio_options.get("custom_weights")
+
+            if weight_preset == "custom":
+                if not custom_weights:
+                    st.error(
+                        "⚠️ 請為每個資產輸入權重 / Please enter a weight for each asset"
+                    )
+                    return
+                try:
+                    normalize_weights(custom_weights, portfolio_tickers)
+                except ValueError as exc:
+                    st.error(f"⚠️ 權重無效 / Invalid weights: {exc}")
+                    return
         
         with st.spinner("正在加載投資組合數據... / Loading portfolio data..."):
             portfolio = PortfolioBacktester(
@@ -846,8 +907,15 @@ def run_portfolio_backtest(
                 end_date=end_date.strftime("%Y-%m-%d"),
                 initial_capital=initial_capital,
                 commission=commission,
+                rebalance_frequency=rebalance_frequency,
             )
             portfolio.load_data()
+
+            if advanced_enabled:
+                if weight_preset == "custom":
+                    portfolio.set_target_weights(custom_weights)
+                elif weight_preset == "inv_vol":
+                    portfolio.apply_inverse_volatility_weights()
         
         with st.spinner("正在運行投資組合回測... / Running portfolio backtest..."):
             equity_curve = portfolio.run()
@@ -928,6 +996,12 @@ def run_portfolio_backtest(
             spy_return_pct = ((benchmark_final / initial_capital) - 1) * 100
 
         tickers_label = ", ".join(portfolio_tickers)
+        effective_weights = portfolio.get_target_weights()
+        strategy_description = _portfolio_strategy_description(
+            rebalance_frequency=rebalance_frequency,
+            target_weights=effective_weights,
+            advanced_enabled=advanced_enabled,
+        )
         render_backtest_export_section(
             export_key_prefix="portfolio_export",
             metadata=ReportMetadata(
@@ -936,8 +1010,16 @@ def run_portfolio_backtest(
                 ticker_or_tickers=tickers_label,
                 start_date=start_date.strftime("%Y-%m-%d"),
                 end_date=end_date.strftime("%Y-%m-%d"),
-                strategy_name="Equal-weight monthly rebalance / 等權重每月再平衡",
-                strategy_params={"tickers": tickers_label, "count": len(portfolio_tickers)},
+                strategy_name=strategy_description,
+                strategy_params={
+                    "tickers": tickers_label,
+                    "count": len(portfolio_tickers),
+                    "rebalance": rebalance_frequency,
+                    "weights": {
+                        t: round(effective_weights[t] * 100, 2)
+                        for t in portfolio_tickers
+                    },
+                },
                 initial_capital=initial_capital,
                 commission=commission,
                 slippage=None,
@@ -1079,13 +1161,19 @@ def run_portfolio_backtest(
         
         st.markdown("---")
         
-        st.info(
-            "💡 **投資組合說明 / Portfolio Notes**\n\n"
-            "- 等權重配置，每月首個交易日重新平衡 / Equal-weight allocation, rebalanced on first trading day of each month\n"
-            "- SPY 基準為買入持有策略 / SPY benchmark is buy-and-hold\n"
-            "- 相關性基於每日收益率計算 / Correlation calculated from daily returns\n"
-            "- 此為回測結果，過去績效不代表未來表現 / Backtested data, past performance ≠ future results"
-        )
+        notes_lines = [
+            f"- 策略 / Strategy: {strategy_description}",
+            "- SPY 基準為買入持有策略 / SPY benchmark is buy-and-hold",
+            "- 相關性基於每日收益率計算 / Correlation calculated from daily returns",
+            "- 此為回測結果，過去績效不代表未來表現 / Backtested data, past performance ≠ future results",
+        ]
+        if not advanced_enabled:
+            notes_lines.insert(
+                1,
+                "- 預設：等權重、每月再平衡（可在進階選項自訂）/ "
+                "Default: equal-weight monthly rebalance (override in Advanced options)",
+            )
+        st.info("💡 **投資組合說明 / Portfolio Notes**\n\n" + "\n".join(notes_lines))
         
     except Exception as e:
         st.error(f"❌ 錯誤 / Error: {str(e)}")
@@ -1466,6 +1554,7 @@ def main():
         
         symbol = None
         portfolio_tickers = None
+        portfolio_options = None
         start_date = None
         end_date = None
         uploaded_file = None
@@ -1488,6 +1577,59 @@ def main():
             
             if portfolio_tickers and not (2 <= len(portfolio_tickers) <= 5):
                 st.error("⚠️ 請選擇 2 到 5 個資產 / Please select 2 to 5 assets")
+
+            portfolio_options = {"enabled": False}
+            with st.expander(
+                "⚙️ 進階投資組合 / Advanced Portfolio",
+                expanded=False,
+            ):
+                advanced_on = st.checkbox(
+                    "啟用進階選項 / Enable advanced options",
+                    value=False,
+                    help=(
+                        "關閉時維持等權重每月再平衡 / "
+                        "When off, equal-weight monthly rebalance (default)"
+                    ),
+                )
+                portfolio_options["enabled"] = advanced_on
+                if advanced_on:
+                    portfolio_options["rebalance_frequency"] = st.selectbox(
+                        "再平衡頻率 / Rebalance frequency",
+                        options=list(REBALANCE_FREQUENCIES),
+                        index=0,
+                        format_func=lambda f: _PORTFOLIO_REBALANCE_LABELS.get(f, f),
+                        help="選擇重新平衡標的權重的頻率 / How often to rebalance to target weights",
+                    )
+                    portfolio_options["weight_preset"] = st.selectbox(
+                        "權重預設 / Weight preset",
+                        options=["equal", "inv_vol", "custom"],
+                        format_func=lambda p: {
+                            "equal": "等權重 / Equal weight",
+                            "inv_vol": "逆波動率 / Inverse volatility",
+                            "custom": "自訂 / Custom",
+                        }.get(p, p),
+                        help="逆波動率使用對齊收盤價的 trailing 波動（OHLCV only）/ "
+                        "Inverse vol uses trailing close-to-close volatility",
+                    )
+                    if portfolio_options["weight_preset"] == "custom" and portfolio_tickers:
+                        st.caption(
+                            "輸入百分比（將自動正規化為 100%）/ "
+                            "Enter percentages (normalized to 100%)"
+                        )
+                        custom_weights = {}
+                        weight_cols = st.columns(len(portfolio_tickers))
+                        default_pct = 100.0 / len(portfolio_tickers)
+                        for col, ticker in zip(weight_cols, portfolio_tickers):
+                            with col:
+                                custom_weights[ticker] = st.number_input(
+                                    f"{ticker} (%)",
+                                    min_value=0.0,
+                                    max_value=100.0,
+                                    value=float(default_pct),
+                                    step=1.0,
+                                    key=f"portfolio_weight_{ticker}",
+                                )
+                        portfolio_options["custom_weights"] = custom_weights
             
             col1, col2 = st.columns(2)
             with col1:
@@ -2414,7 +2556,8 @@ def main():
                 end_date=end_date,
                 initial_capital=initial_capital,
                 commission=commission,
-                theme=st.session_state.theme
+                theme=st.session_state.theme,
+                portfolio_options=portfolio_options,
             )
         
         # Single asset mode execution (existing code, unchanged)
