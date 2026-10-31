@@ -17,10 +17,14 @@ from backtester.metrics import PerformanceMetrics, calculate_buy_and_hold
 from backtester.strategies.sma_crossover import SMACrossover
 from backtester.strategies.rsi_mean_reversion import RSIMeanReversion
 from backtester.strategies.donchian_breakout import DonchianBreakout
+from backtester.strategies.macd_crossover import MACDCrossover
+from backtester.strategies.bollinger_mean_reversion import BollingerMeanReversion
 from backtester.strategy_templates import (
     STRATEGY_SMA,
     STRATEGY_RSI,
     STRATEGY_DONCHIAN,
+    STRATEGY_MACD,
+    STRATEGY_BOLLINGER,
     CUSTOM_TEMPLATE_ID,
     apply_template_params,
     default_template_id,
@@ -78,6 +82,23 @@ from backtester.cost_sensitivity import (
     pivot_cost_heatmap,
     run_cost_sensitivity_grid,
     validate_cost_grid,
+)
+from backtester.walk_forward import (
+    MAX_WALK_FORWARD_FOLDS,
+    WF_MODE_FIXED,
+    WF_MODE_OPTIMIZE,
+    WF_WINDOW_ANCHORED,
+    WF_WINDOW_ROLLING,
+    WINDOW_UNIT_BARS,
+    WINDOW_UNIT_MONTHS,
+    count_walk_forward_folds,
+    mode_label,
+    plot_walk_forward_fold_returns,
+    plot_walk_forward_oos_equity,
+    sidebar_fixed_params,
+    validate_walk_forward_config,
+    window_length_to_bars,
+    run_walk_forward,
 )
 
 
@@ -386,6 +407,11 @@ def display_parameter_scan_section(
             plot_scan_bar_1d(ranked, "channel_period", rank_metric, theme=theme),
             use_container_width=True,
         )
+    elif strategy_type == STRATEGY_MACD and pivot_info is None:
+        st.plotly_chart(
+            plot_scan_bar_1d(ranked, "signal_period", rank_metric, theme=theme),
+            use_container_width=True,
+        )
 
     display_cols = (
         ["rank"]
@@ -410,7 +436,10 @@ def display_parameter_scan_section(
     for _, row in ranked.iterrows():
         parts = [f"#{int(row['rank'])}"]
         for col in param_columns_for_strategy(strategy_type):
-            parts.append(f"{col}={int(row[col])}")
+            if col == "bb_std":
+                parts.append(f"{col}={float(row[col]):g}")
+            else:
+                parts.append(f"{col}={int(row[col])}")
         parts.append(f"{metric_label(rank_metric)}={row[rank_metric]:.3f}")
         option_labels.append(" | ".join(parts))
 
@@ -426,10 +455,12 @@ def display_parameter_scan_section(
     selected_row = ranked.iloc[selected_idx]
 
     if st.button("✅ 套用並更新側邊欄 / Apply to Sidebar", key="param_scan_apply_btn"):
-        params = {
-            col: int(selected_row[col])
-            for col in param_columns_for_strategy(strategy_type)
-        }
+        params = {}
+        for col in param_columns_for_strategy(strategy_type):
+            if col == "bb_std":
+                params[col] = float(selected_row[col])
+            else:
+                params[col] = int(selected_row[col])
         apply_params_to_session(st.session_state, strategy_type, params)
         st.success(
             "已套用參數（模板已切為「自訂」）。請再次點擊「運行回測」查看結果 / "
@@ -567,6 +598,148 @@ def display_cost_sensitivity_section(
         "strategies based on the grid alone."
     )
 
+
+def display_walk_forward_section(
+    data: pd.DataFrame,
+    strategy_type: str,
+    train_bars: int,
+    test_bars: int,
+    step_bars: int,
+    anchored: bool,
+    mode: str,
+    fixed_params: dict,
+    param_grid: Optional[dict],
+    rank_metric: str,
+    initial_capital: float,
+    commission: float,
+    slippage: float,
+    position_size: float,
+    theme: str,
+) -> None:
+    """Run walk-forward OOS validation (opt-in research layer)."""
+    ok, err_msg = validate_walk_forward_config(
+        data=data,
+        train_bars=train_bars,
+        test_bars=test_bars,
+        step_bars=step_bars,
+        anchored=anchored,
+        mode=mode,
+        strategy_type=strategy_type,
+        param_grid=param_grid if mode == WF_MODE_OPTIMIZE else None,
+    )
+    if not ok:
+        st.error(err_msg)
+        return
+
+    n_folds = count_walk_forward_folds(
+        len(data), train_bars, test_bars, step_bars, anchored
+    )
+    st.markdown("## 📐 步進樣本外驗證 / Walk-Forward OOS Validation")
+    st.caption(
+        f"{mode_label(mode)} · {n_folds} 折 / folds · "
+        f"上限 {MAX_WALK_FORWARD_FOLDS} 折 / max {MAX_WALK_FORWARD_FOLDS} folds"
+    )
+    st.caption(
+        "描述性驗證工具，非統計顯著性檢定 / "
+        "Descriptive robustness check — not a significance test."
+    )
+
+    progress = st.progress(0.0, text="準備步進驗證 / Preparing walk-forward...")
+
+    def _on_progress(done: int, total: int) -> None:
+        progress.progress(
+            done / total,
+            text=f"折 {done}/{total} / Fold {done}/{total}",
+        )
+
+    try:
+        with st.spinner(
+            f"正在執行 {n_folds} 折樣本外驗證... / Running {n_folds} OOS folds..."
+        ):
+            result = run_walk_forward(
+                data=data,
+                strategy_type=strategy_type,
+                train_bars=train_bars,
+                test_bars=test_bars,
+                step_bars=step_bars,
+                anchored=anchored,
+                mode=mode,
+                fixed_params=fixed_params,
+                param_grid=param_grid,
+                rank_metric=rank_metric,
+                initial_capital=initial_capital,
+                commission=commission,
+                slippage=slippage,
+                position_size=position_size,
+                progress_callback=_on_progress,
+            )
+    finally:
+        progress.empty()
+
+    agg = result.aggregate
+    if agg:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric(
+            "平均 OOS 回報 / Mean OOS Return",
+            f"{agg.get(f'{METRIC_TOTAL_RETURN}_mean', float('nan')):.2f}%",
+        )
+        c2.metric(
+            "平均 OOS 夏普 / Mean OOS Sharpe",
+            f"{agg.get(f'{METRIC_SHARPE}_mean', float('nan')):.3f}",
+        )
+        c3.metric(
+            "最差折回撤 / Worst Fold DD",
+            f"{agg.get('worst_fold_max_drawdown_pct', float('nan')):.2f}%",
+        )
+        c4.metric(
+            "複合 OOS 回報 / Compound OOS Return",
+            f"{agg.get('compound_oos_return_pct', float('nan')):.2f}%",
+        )
+
+    col_l, col_r = st.columns(2)
+    with col_l:
+        st.plotly_chart(
+            plot_walk_forward_fold_returns(result.folds, theme=theme),
+            use_container_width=True,
+        )
+    with col_r:
+        st.plotly_chart(
+            plot_walk_forward_oos_equity(result.oos_equity, theme=theme),
+            use_container_width=True,
+        )
+
+    st.markdown("### 各折樣本外結果 / Per-Fold OOS Results")
+    display_cols = ["fold", "test_start", "test_end", "train_bars", "test_bars"]
+    display_cols += param_columns_for_strategy(strategy_type)
+    display_cols += [f"oos_{c}" for c in (
+        METRIC_TOTAL_RETURN,
+        METRIC_SHARPE,
+        METRIC_MAX_DRAWDOWN,
+        "win_rate_pct",
+        "trade_count",
+    )]
+    display_cols = [c for c in display_cols if c in result.folds.columns]
+    st.dataframe(
+        result.folds[display_cols].style.format(
+            {
+                f"oos_{METRIC_TOTAL_RETURN}": "{:.2f}",
+                f"oos_{METRIC_SHARPE}": "{:.3f}",
+                f"oos_{METRIC_MAX_DRAWDOWN}": "{:.2f}",
+                "oos_win_rate_pct": "{:.1f}",
+            },
+            na_rep="N/A",
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.info(
+        "💡 樣本外結果反映滾動或錨定窗口下的穩健性；"
+        "優化模式會在每折訓練期選參，仍可能過度適合。"
+        "主回測（上方）不受影響 / "
+        "OOS folds assess stability across windows; optimize mode still risks overfitting. "
+        "Main backtest above is unchanged."
+    )
 
 def render_backtest_export_section(
     *,
@@ -1268,7 +1441,13 @@ def main():
             else:
                 strategy_type = st.selectbox(
                     "策略 / Strategy",
-                    [STRATEGY_SMA, STRATEGY_RSI, STRATEGY_DONCHIAN],
+                    [
+                        STRATEGY_SMA,
+                        STRATEGY_RSI,
+                        STRATEGY_DONCHIAN,
+                        STRATEGY_MACD,
+                        STRATEGY_BOLLINGER,
+                    ],
                     key="strategy_type",
                     help="選擇交易策略 / Select trading strategy",
                 )
@@ -1493,10 +1672,69 @@ def main():
                 key="channel_period",
                 help="使用前 N 日最高/最低（不含當日）/ Prior N-day high/low excluding current bar",
             )
+        elif backtest_mode == "單一資產 / Single Asset" and strategy_type == STRATEGY_MACD:
+            if "fast_period" not in st.session_state:
+                st.session_state.fast_period = 12
+            if "slow_period" not in st.session_state:
+                st.session_state.slow_period = 26
+            if "signal_period" not in st.session_state:
+                st.session_state.signal_period = 9
+            st.number_input(
+                "快 EMA 週期 / Fast EMA Period",
+                min_value=2,
+                max_value=100,
+                step=1,
+                key="fast_period",
+            )
+            st.number_input(
+                "慢 EMA 週期 / Slow EMA Period",
+                min_value=5,
+                max_value=200,
+                step=1,
+                key="slow_period",
+            )
+            st.number_input(
+                "信號線週期 / Signal Period",
+                min_value=2,
+                max_value=50,
+                step=1,
+                key="signal_period",
+            )
+        elif backtest_mode == "單一資產 / Single Asset" and strategy_type == STRATEGY_BOLLINGER:
+            if "bb_period" not in st.session_state:
+                st.session_state.bb_period = 20
+            if "bb_std" not in st.session_state:
+                st.session_state.bb_std = 2.0
+            st.number_input(
+                "布林週期 / BB Window",
+                min_value=5,
+                max_value=252,
+                step=1,
+                key="bb_period",
+            )
+            st.number_input(
+                "標準差倍數 / Std Dev Multiplier",
+                min_value=0.5,
+                max_value=4.0,
+                step=0.5,
+                format="%.1f",
+                key="bb_std",
+            )
         
         enable_param_scan = False
         scan_rank_metric = METRIC_SHARPE
         scan_param_grid = {}
+        enable_walk_forward = False
+        wf_train_bars = wf_test_bars = wf_step_bars = 0
+        wf_anchored = False
+        wf_mode = WF_MODE_FIXED
+        wf_rank_metric = METRIC_SHARPE
+        wf_param_grid: dict = {}
+        enable_cost_scan = False
+        cost_sweep_mode = SWEEP_BOTH
+        cost_chart_metric = METRIC_TOTAL_RETURN
+        cost_commission_grid: list = []
+        cost_slippage_grid: list = []
         
         if backtest_mode == "單一資產 / Single Asset":
             st.markdown("---")
@@ -1564,6 +1802,73 @@ def main():
                     scan_param_grid = {
                         "channel_period": arange_params(scan_ch_start, scan_ch_end, scan_ch_step),
                     }
+                elif strategy_type == STRATEGY_MACD:
+                    st.caption(
+                        f"快 × 慢網格（信號固定 {int(st.session_state.get('signal_period', 9))}）/ "
+                        "Fast × slow grid (signal fixed from sidebar)"
+                    )
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        scan_macd_fast_start = st.number_input(
+                            "快線起 / Fast from", 2, 100, 8, 1, key="scan_macd_fast_start"
+                        )
+                        scan_macd_fast_end = st.number_input(
+                            "快線止 / Fast to", 2, 100, 16, 1, key="scan_macd_fast_end"
+                        )
+                        scan_macd_fast_step = st.number_input(
+                            "快線步長 / Fast step", 1, 20, 2, 1, key="scan_macd_fast_step"
+                        )
+                    with c2:
+                        scan_macd_slow_start = st.number_input(
+                            "慢線起 / Slow from", 5, 200, 20, 1, key="scan_macd_slow_start"
+                        )
+                        scan_macd_slow_end = st.number_input(
+                            "慢線止 / Slow to", 5, 200, 32, 1, key="scan_macd_slow_end"
+                        )
+                        scan_macd_slow_step = st.number_input(
+                            "慢線步長 / Slow step", 1, 20, 2, 1, key="scan_macd_slow_step"
+                        )
+                    scan_param_grid = {
+                        "fast_period": arange_params(
+                            scan_macd_fast_start, scan_macd_fast_end, scan_macd_fast_step
+                        ),
+                        "slow_period": arange_params(
+                            scan_macd_slow_start, scan_macd_slow_end, scan_macd_slow_step
+                        ),
+                        "signal_period": [int(st.session_state.get("signal_period", 9))],
+                    }
+                elif strategy_type == STRATEGY_BOLLINGER:
+                    st.caption("週期 × 標準差倍數 / Window × std-dev multiplier")
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        scan_bb_p_start = st.number_input(
+                            "週期起 / Period from", 5, 252, 10, 1, key="scan_bb_p_start"
+                        )
+                        scan_bb_p_end = st.number_input(
+                            "週期止 / Period to", 5, 252, 30, 1, key="scan_bb_p_end"
+                        )
+                        scan_bb_p_step = st.number_input(
+                            "週期步長 / Period step", 1, 50, 5, 1, key="scan_bb_p_step"
+                        )
+                    with c2:
+                        scan_bb_std_start = st.number_input(
+                            "σ 起 / Std from", 1, 4, 1, 1, key="scan_bb_std_start"
+                        )
+                        scan_bb_std_end = st.number_input(
+                            "σ 止 / Std to", 1, 4, 3, 1, key="scan_bb_std_end"
+                        )
+                        scan_bb_std_step = st.number_input(
+                            "σ 步長 / Std step", 1, 2, 1, 1, key="scan_bb_std_step"
+                        )
+                    scan_param_grid = {
+                        "bb_period": arange_params(scan_bb_p_start, scan_bb_p_end, scan_bb_p_step),
+                        "bb_std": [
+                            float(x)
+                            for x in arange_params(
+                                scan_bb_std_start, scan_bb_std_end, scan_bb_std_step
+                            )
+                        ],
+                    }
                 
                 n_preview = count_valid_combinations(strategy_type, scan_param_grid)
                 if n_preview > MAX_GRID_COMBINATIONS:
@@ -1576,13 +1881,6 @@ def main():
                 else:
                     st.caption(f"將掃描 {n_preview} 組 / Will scan {n_preview} combinations")
 
-        enable_cost_scan = False
-        cost_sweep_mode = SWEEP_BOTH
-        cost_chart_metric = METRIC_TOTAL_RETURN
-        cost_commission_grid: list = []
-        cost_slippage_grid: list = []
-
-        if backtest_mode == "單一資產 / Single Asset":
             st.markdown("---")
             st.subheader("💸 成本敏感度 / Cost Sensitivity")
             st.caption(
@@ -1720,6 +2018,178 @@ def main():
                     st.caption(
                         f"將掃描 {n_cost_preview} 組 / Will scan {n_cost_preview} combinations"
                     )
+
+            st.markdown("---")
+            st.subheader("📐 步進樣本外 / Walk-Forward OOS")
+            st.caption(
+                "L1 研究層：滾動訓練／測試折（預設關閉）/ "
+                "L1 research: rolling train/test folds (off by default)"
+            )
+
+            enable_walk_forward = st.checkbox(
+                "啟用步進樣本外驗證 / Enable Walk-Forward Validation",
+                value=False,
+                help=(
+                    "主要回測後以獨立折評估樣本外表現 / "
+                    "After main backtest, evaluate held-out folds (L0 only)"
+                ),
+            )
+
+            wf_window_unit = WINDOW_UNIT_MONTHS
+            wf_train_len = 12
+            wf_test_len = 3
+            wf_step_len = 3
+            wf_window_style = WF_WINDOW_ROLLING
+            wf_mode = WF_MODE_FIXED
+            wf_rank_metric = METRIC_SHARPE
+            wf_param_grid: dict = {}
+            wf_train_bars = 252
+            wf_test_bars = 63
+            wf_step_bars = 63
+            wf_anchored = False
+
+            if enable_walk_forward:
+                wf_window_unit = st.radio(
+                    "窗口單位 / Window unit",
+                    options=[WINDOW_UNIT_MONTHS, WINDOW_UNIT_BARS],
+                    format_func=lambda u: (
+                        "月（≈21 交易日）/ Months (~21 trading days)"
+                        if u == WINDOW_UNIT_MONTHS
+                        else "K 線根數 / Bar count"
+                    ),
+                    horizontal=True,
+                    key="wf_window_unit",
+                )
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    wf_train_len = st.number_input(
+                        "訓練窗口 / Train",
+                        min_value=1,
+                        max_value=600 if wf_window_unit == WINDOW_UNIT_BARS else 120,
+                        value=12 if wf_window_unit == WINDOW_UNIT_MONTHS else 252,
+                        step=1,
+                        key="wf_train_len",
+                    )
+                with c2:
+                    wf_test_len = st.number_input(
+                        "測試窗口 / Test",
+                        min_value=1,
+                        max_value=252 if wf_window_unit == WINDOW_UNIT_BARS else 36,
+                        value=3 if wf_window_unit == WINDOW_UNIT_MONTHS else 63,
+                        step=1,
+                        key="wf_test_len",
+                    )
+                with c3:
+                    wf_step_len = st.number_input(
+                        "步進 / Step (roll)",
+                        min_value=1,
+                        max_value=252 if wf_window_unit == WINDOW_UNIT_BARS else 36,
+                        value=3 if wf_window_unit == WINDOW_UNIT_MONTHS else 63,
+                        step=1,
+                        key="wf_step_len",
+                    )
+
+                wf_window_style = st.radio(
+                    "窗口類型 / Window type",
+                    options=[WF_WINDOW_ROLLING, WF_WINDOW_ANCHORED],
+                    format_func=lambda w: (
+                        "滾動訓練窗 / Rolling train"
+                        if w == WF_WINDOW_ROLLING
+                        else "錨定擴展訓練 / Anchored expanding train"
+                    ),
+                    horizontal=True,
+                    key="wf_window_style",
+                )
+
+                wf_mode = st.radio(
+                    "驗證模式 / Validation mode",
+                    options=[WF_MODE_FIXED, WF_MODE_OPTIMIZE],
+                    format_func=lambda m: (
+                        "固定側邊欄參數 / Fixed sidebar params"
+                        if m == WF_MODE_FIXED
+                        else "訓練期網格選參 + OOS / In-sample grid + OOS"
+                    ),
+                    key="wf_mode",
+                )
+
+                if wf_mode == WF_MODE_OPTIMIZE:
+                    wf_rank_metric = st.selectbox(
+                        "訓練期排名 / In-sample rank by",
+                        options=list(RANK_METRIC_OPTIONS),
+                        format_func=metric_label,
+                        index=0,
+                        key="wf_rank_metric",
+                    )
+                    if enable_param_scan and scan_param_grid:
+                        wf_param_grid = scan_param_grid
+                        st.caption(
+                            "使用上方參數掃描網格作為訓練期搜索空間 / "
+                            "Using parameter-scan grid as in-sample search space"
+                        )
+                    else:
+                        st.caption(
+                            "未啟用參數掃描時使用精簡預設網格 / "
+                            "Compact default grid when parameter scan is off"
+                        )
+                        if strategy_type == STRATEGY_SMA:
+                            wf_param_grid = {
+                                "fast_period": arange_params(10, 30, 5),
+                                "slow_period": arange_params(40, 80, 10),
+                            }
+                        elif strategy_type == STRATEGY_RSI:
+                            wf_param_grid = {
+                                "rsi_period": arange_params(10, 20, 2),
+                                "rsi_oversold": arange_params(25, 35, 5),
+                                "rsi_overbought": [
+                                    int(st.session_state.get("rsi_overbought", 70))
+                                ],
+                            }
+                        elif strategy_type == STRATEGY_DONCHIAN:
+                            wf_param_grid = {
+                                "channel_period": arange_params(10, 30, 5),
+                            }
+                        elif strategy_type == STRATEGY_MACD:
+                            wf_param_grid = {
+                                "fast_period": arange_params(8, 16, 2),
+                                "slow_period": arange_params(20, 32, 2),
+                                "signal_period": [
+                                    int(st.session_state.get("signal_period", 9))
+                                ],
+                            }
+                        elif strategy_type == STRATEGY_BOLLINGER:
+                            wf_param_grid = {
+                                "bb_period": arange_params(10, 30, 5),
+                                "bb_std": [
+                                    float(x)
+                                    for x in arange_params(1, 3, 1)
+                                ],
+                            }
+
+                    n_wf_grid = count_valid_combinations(strategy_type, wf_param_grid)
+                    if n_wf_grid > MAX_GRID_COMBINATIONS:
+                        st.warning(
+                            f"⚠️ 每折網格 {n_wf_grid} 組 > 上限 {MAX_GRID_COMBINATIONS} / "
+                            f"Per-fold grid {n_wf_grid} exceeds limit"
+                        )
+
+                wf_train_bars = window_length_to_bars(wf_train_len, wf_window_unit)
+                wf_test_bars = window_length_to_bars(wf_test_len, wf_window_unit)
+                wf_step_bars = window_length_to_bars(wf_step_len, wf_window_unit)
+                wf_anchored = wf_window_style == WF_WINDOW_ANCHORED
+                st.caption(
+                    f"≈ {wf_train_bars} 訓練 + {wf_test_bars} 測試 K 線，步進 {wf_step_bars} / "
+                    f"~{wf_train_bars} train + {wf_test_bars} test bars, step {wf_step_bars}"
+                )
+        else:
+            enable_walk_forward = False
+            enable_cost_scan = False
+            wf_train_bars = wf_test_bars = wf_step_bars = 0
+            wf_anchored = False
+            wf_mode = WF_MODE_FIXED
+            wf_rank_metric = METRIC_SHARPE
+            wf_param_grid = {}
+            cost_commission_grid = []
+            cost_slippage_grid = []
         
         # Research panels only for single asset mode
         show_calendar = False
@@ -1989,12 +2459,27 @@ def main():
                             "oversold": rsi_oversold,
                             "overbought": rsi_overbought,
                         }
-                    else:
+                    elif strategy_type == STRATEGY_DONCHIAN:
                         strategy_class = DonchianBreakout
                         strategy_params = {
                             "channel_period": int(channel_period),
                         }
-                    
+                    elif strategy_type == STRATEGY_MACD:
+                        strategy_class = MACDCrossover
+                        strategy_params = {
+                            "fast_period": int(st.session_state["fast_period"]),
+                            "slow_period": int(st.session_state["slow_period"]),
+                            "signal_period": int(st.session_state["signal_period"]),
+                        }
+                    elif strategy_type == STRATEGY_BOLLINGER:
+                        strategy_class = BollingerMeanReversion
+                        strategy_params = {
+                            "bb_period": int(st.session_state["bb_period"]),
+                            "bb_std": float(st.session_state["bb_std"]),
+                        }
+                    else:
+                        st.error(f"未知策略 / Unknown strategy: {strategy_type}")
+                        return
                     # Phase 5: Run control vs event-aware comparison if enabled
                     if enable_phase5:
                         # Configure event rules
@@ -2684,6 +3169,38 @@ def main():
                         position_size=position_size,
                         theme=st.session_state.theme,
                     )
+
+                if enable_walk_forward:
+                    st.markdown("---")
+                    wf_fixed = sidebar_fixed_params(
+                        strategy_type=strategy_type,
+                        fast_period=int(st.session_state.get("fast_period", 20)),
+                        slow_period=int(st.session_state.get("slow_period", 50)),
+                        rsi_period=int(st.session_state.get("rsi_period", 14)),
+                        rsi_oversold=int(st.session_state.get("rsi_oversold", 30)),
+                        rsi_overbought=int(st.session_state.get("rsi_overbought", 70)),
+                        channel_period=int(st.session_state.get("channel_period", 20)),
+                        signal_period=int(st.session_state.get("signal_period", 9)),
+                        bb_period=int(st.session_state.get("bb_period", 20)),
+                        bb_std=float(st.session_state.get("bb_std", 2.0)),
+                    )
+                    display_walk_forward_section(
+                        data=data,
+                        strategy_type=strategy_type,
+                        train_bars=wf_train_bars,
+                        test_bars=wf_test_bars,
+                        step_bars=wf_step_bars,
+                        anchored=wf_anchored,
+                        mode=wf_mode,
+                        fixed_params=wf_fixed,
+                        param_grid=wf_param_grid if wf_mode == WF_MODE_OPTIMIZE else None,
+                        rank_metric=wf_rank_metric,
+                        initial_capital=initial_capital,
+                        commission=commission,
+                        slippage=slippage,
+                        position_size=position_size,
+                        theme=st.session_state.theme,
+                    )
             
             except Exception as e:
                 st.error(f"❌ 錯誤 / Error: {str(e)}")
@@ -2715,6 +3232,7 @@ def main():
         - 📥 下載交易明細
         - 🔬 可選參數掃描／網格優化（見 [docs/PARAMETER-SCAN.md](docs/PARAMETER-SCAN.md)）
         - 💸 可選成本敏感度掃描（見 [docs/COST-SENSITIVITY.md](docs/COST-SENSITIVITY.md)）
+        - 📐 可選步進樣本外驗證（見 [docs/WALK-FORWARD.md](docs/WALK-FORWARD.md)）
         """)
 
 

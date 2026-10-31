@@ -7,6 +7,8 @@ from backtester.data import DataLoader
 from backtester.parameter_scan import (
     MAX_GRID_COMBINATIONS,
     METRIC_SHARPE,
+    STRATEGY_BOLLINGER,
+    STRATEGY_MACD,
     STRATEGY_SMA,
     STRATEGY_RSI,
     STRATEGY_DONCHIAN,
@@ -123,3 +125,20 @@ def test_rsi_grid_respects_oversold_overbought():
 def test_donchian_1d_grid():
     grid = {"channel_period": [10, 15, 20]}
     assert count_valid_combinations(STRATEGY_DONCHIAN, grid) == 3
+
+
+def test_macd_grid_skips_fast_ge_slow():
+    grid = {
+        "fast_period": [8, 12],
+        "slow_period": [20, 26],
+        "signal_period": [9],
+    }
+    combos = list(iter_param_combinations(STRATEGY_MACD, grid))
+    assert all(c["fast_period"] < c["slow_period"] for c in combos)
+    assert len(combos) == 4
+
+
+def test_bollinger_grid_combinations():
+    grid = {"bb_period": [10, 20], "bb_std": [2.0, 3.0]}
+    combos = list(iter_param_combinations(STRATEGY_BOLLINGER, grid))
+    assert len(combos) == 4
