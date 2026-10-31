@@ -21,6 +21,8 @@ To avoid timeouts and memory pressure, each scan is capped at **`MAX_GRID_COMBIN
 | SMA Crossover | `fast_period` × `slow_period` | Only combinations with fast &lt; slow |
 | RSI Mean Reversion | `rsi_period` × `rsi_oversold` | `rsi_overbought` fixed from sidebar value |
 | Donchian Breakout | `channel_period` | 1D bar chart |
+| MACD Crossover | `fast_period` × `slow_period` | `signal_period` fixed from sidebar; fast &lt; slow |
+| Bollinger Mean Reversion | `bb_period` × `bb_std` | 2D heatmap (integer σ multipliers in grid) |
 
 ## Verification (Streamlit Cloud / mobile)
 
