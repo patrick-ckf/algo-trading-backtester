@@ -65,6 +65,20 @@ from backtester.parameter_scan import (
     run_parameter_grid,
     validate_grid_size,
 )
+from backtester.cost_sensitivity import (
+    MAX_COST_COMBINATIONS,
+    SWEEP_BOTH,
+    SWEEP_COMMISSION,
+    SWEEP_SLIPPAGE,
+    SWEEP_MODE_LABELS,
+    count_cost_combinations,
+    float_range_decimals,
+    plot_cost_heatmap,
+    plot_cost_line,
+    pivot_cost_heatmap,
+    run_cost_sensitivity_grid,
+    validate_cost_grid,
+)
 
 
 st.set_page_config(
@@ -428,6 +442,129 @@ def display_parameter_scan_section(
         "主回測（上方）仍使用側邊欄當前參數 / "
         "Scan results are for research; overfitting risk applies. "
         "Main backtest above uses current sidebar parameters."
+    )
+
+
+def display_cost_sensitivity_section(
+    data: pd.DataFrame,
+    strategy_factory,
+    sweep_mode: str,
+    commission_grid: list,
+    slippage_grid: list,
+    fixed_commission: float,
+    fixed_slippage: float,
+    chart_metric: str,
+    initial_capital: float,
+    position_size: float,
+    theme: str,
+) -> None:
+    """Sweep commission/slippage and render heatmap or line chart (opt-in L1 research)."""
+    ok, err_msg = validate_cost_grid(
+        sweep_mode,
+        commission_grid,
+        slippage_grid,
+        fixed_commission,
+        fixed_slippage,
+    )
+    if not ok:
+        st.error(err_msg)
+        return
+
+    n_combos = count_cost_combinations(sweep_mode, commission_grid, slippage_grid)
+    st.markdown("## 💸 成本敏感度 / Cost Sensitivity")
+    st.caption(
+        f"固定策略參數，掃描交易成本假設（最多 {MAX_COST_COMBINATIONS} 組）/ "
+        f"Same strategy params; sweep friction assumptions (max {MAX_COST_COMBINATIONS} combos)"
+    )
+
+    progress = st.progress(0.0, text="準備成本掃描 / Preparing cost scan...")
+
+    def _on_progress(done: int, total: int) -> None:
+        progress.progress(
+            done / total,
+            text=f"成本掃描 {done}/{total} / Cost scan {done}/{total}",
+        )
+
+    try:
+        with st.spinner(
+            f"正在掃描 {n_combos} 組成本假設... / Running {n_combos} cost scenarios..."
+        ):
+            results_df = run_cost_sensitivity_grid(
+                data=data,
+                strategy_factory=strategy_factory,
+                sweep_mode=sweep_mode,
+                commission_grid=commission_grid,
+                slippage_grid=slippage_grid,
+                fixed_commission=fixed_commission,
+                fixed_slippage=fixed_slippage,
+                initial_capital=initial_capital,
+                position_size=position_size,
+                progress_callback=_on_progress,
+            )
+    finally:
+        progress.empty()
+
+    st.markdown(f"### 指標 / Metrics — {metric_label(chart_metric)}")
+
+    pivot = pivot_cost_heatmap(results_df, chart_metric)
+    if pivot is not None:
+        st.plotly_chart(
+            plot_cost_heatmap(pivot, chart_metric, theme=theme),
+            use_container_width=True,
+        )
+    elif sweep_mode == SWEEP_COMMISSION:
+        st.plotly_chart(
+            plot_cost_line(
+                results_df,
+                "commission_pct",
+                "佣金 / Commission (%)",
+                chart_metric,
+                theme=theme,
+            ),
+            use_container_width=True,
+        )
+    elif sweep_mode == SWEEP_SLIPPAGE:
+        st.plotly_chart(
+            plot_cost_line(
+                results_df,
+                "slippage_pct",
+                "滑點 / Slippage (%)",
+                chart_metric,
+                theme=theme,
+            ),
+            use_container_width=True,
+        )
+
+    display_cols = [
+        "commission_pct",
+        "slippage_pct",
+        METRIC_SHARPE,
+        METRIC_TOTAL_RETURN,
+        METRIC_MAX_DRAWDOWN,
+        "trade_count",
+    ]
+    st.dataframe(
+        results_df[display_cols].style.format(
+            {
+                "commission_pct": "{:.3f}",
+                "slippage_pct": "{:.3f}",
+                METRIC_SHARPE: "{:.3f}",
+                METRIC_TOTAL_RETURN: "{:.2f}",
+                METRIC_MAX_DRAWDOWN: "{:.2f}",
+            },
+            na_rep="N/A",
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.info(
+        "💡 **敏感度分析，非優化建議** — 較低的佣金或滑點假設通常會改善回測績效；"
+        "請依實際券商費率與流動性設定，勿以掃描結果選擇「最低成本」作為策略依據。\n\n"
+        "**Sensitivity tooling, not optimization advice** — lower friction assumptions "
+        "usually improve backtest metrics; set costs to realistic values for your broker "
+        "and liquidity. Do not treat this scan as a reason to minimize costs or pick "
+        "strategies based on the grid alone."
     )
 
 
@@ -1438,6 +1575,151 @@ def main():
                     st.warning("⚠️ 無有效組合 / No valid combinations")
                 else:
                     st.caption(f"將掃描 {n_preview} 組 / Will scan {n_preview} combinations")
+
+        enable_cost_scan = False
+        cost_sweep_mode = SWEEP_BOTH
+        cost_chart_metric = METRIC_TOTAL_RETURN
+        cost_commission_grid: list = []
+        cost_slippage_grid: list = []
+
+        if backtest_mode == "單一資產 / Single Asset":
+            st.markdown("---")
+            st.subheader("💸 成本敏感度 / Cost Sensitivity")
+            st.caption(
+                "L1 研究層：交易成本假設敏感度（預設關閉）/ "
+                "L1 research: friction sensitivity (off by default)"
+            )
+
+            enable_cost_scan = st.checkbox(
+                "啟用成本敏感度掃描 / Enable Cost Sensitivity Scan",
+                value=False,
+                help=(
+                    f"在主要回測後以相同策略重跑不同佣金／滑點（最多 {MAX_COST_COMBINATIONS} 組）/ "
+                    f"After main backtest, re-run same strategy under cost grid (max {MAX_COST_COMBINATIONS})"
+                ),
+            )
+
+            if enable_cost_scan:
+                cost_sweep_mode = st.selectbox(
+                    "掃描模式 / Sweep mode",
+                    options=[SWEEP_BOTH, SWEEP_COMMISSION, SWEEP_SLIPPAGE],
+                    format_func=lambda k: SWEEP_MODE_LABELS[k],
+                    index=0,
+                )
+                cost_chart_metric = st.selectbox(
+                    "圖表指標 / Chart metric",
+                    options=list(RANK_METRIC_OPTIONS),
+                    format_func=metric_label,
+                    index=1,
+                )
+
+                if cost_sweep_mode in (SWEEP_BOTH, SWEEP_COMMISSION):
+                    st.caption("佣金網格（%/每筆）/ Commission grid (% per trade)")
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        cost_comm_start = st.number_input(
+                            "佣金起 / Comm from (%)",
+                            0.0,
+                            1.0,
+                            0.0,
+                            0.01,
+                            format="%.2f",
+                            key="cost_comm_start",
+                        )
+                        cost_comm_end = st.number_input(
+                            "佣金止 / Comm to (%)",
+                            0.0,
+                            1.0,
+                            0.2,
+                            0.01,
+                            format="%.2f",
+                            key="cost_comm_end",
+                        )
+                    with c2:
+                        cost_comm_step = st.number_input(
+                            "佣金步長 / Comm step (%)",
+                            0.001,
+                            0.5,
+                            0.05,
+                            0.001,
+                            format="%.3f",
+                            key="cost_comm_step",
+                        )
+                    cost_commission_grid = float_range_decimals(
+                        cost_comm_start / 100.0,
+                        cost_comm_end / 100.0,
+                        cost_comm_step / 100.0,
+                    )
+                else:
+                    cost_commission_grid = []
+
+                if cost_sweep_mode in (SWEEP_BOTH, SWEEP_SLIPPAGE):
+                    st.caption("滑點網格（%/每筆）/ Slippage grid (% per trade)")
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        cost_slip_start = st.number_input(
+                            "滑點起 / Slip from (%)",
+                            0.0,
+                            1.0,
+                            0.0,
+                            0.01,
+                            format="%.2f",
+                            key="cost_slip_start",
+                        )
+                        cost_slip_end = st.number_input(
+                            "滑點止 / Slip to (%)",
+                            0.0,
+                            1.0,
+                            0.1,
+                            0.01,
+                            format="%.2f",
+                            key="cost_slip_end",
+                        )
+                    with c2:
+                        cost_slip_step = st.number_input(
+                            "滑點步長 / Slip step (%)",
+                            0.001,
+                            0.5,
+                            0.025,
+                            0.001,
+                            format="%.3f",
+                            key="cost_slip_step",
+                        )
+                    cost_slippage_grid = float_range_decimals(
+                        cost_slip_start / 100.0,
+                        cost_slip_end / 100.0,
+                        cost_slip_step / 100.0,
+                    )
+                else:
+                    cost_slippage_grid = []
+
+                if cost_sweep_mode == SWEEP_COMMISSION:
+                    st.caption(
+                        f"滑點固定為側邊欄 {slippage * 100:.2f}% / "
+                        f"Slippage fixed at sidebar {slippage * 100:.2f}%"
+                    )
+                elif cost_sweep_mode == SWEEP_SLIPPAGE:
+                    st.caption(
+                        f"佣金固定為側邊欄 {commission * 100:.2f}% / "
+                        f"Commission fixed at sidebar {commission * 100:.2f}%"
+                    )
+
+                n_cost_preview = count_cost_combinations(
+                    cost_sweep_mode,
+                    cost_commission_grid,
+                    cost_slippage_grid,
+                )
+                if n_cost_preview > MAX_COST_COMBINATIONS:
+                    st.warning(
+                        f"⚠️ 預覽 {n_cost_preview} 組 > 上限 {MAX_COST_COMBINATIONS}；請縮小範圍 / "
+                        f"Preview {n_cost_preview} combos exceeds limit {MAX_COST_COMBINATIONS}"
+                    )
+                elif n_cost_preview == 0:
+                    st.warning("⚠️ 無有效組合 / No valid combinations")
+                else:
+                    st.caption(
+                        f"將掃描 {n_cost_preview} 組 / Will scan {n_cost_preview} combinations"
+                    )
         
         # Research panels only for single asset mode
         show_calendar = False
@@ -2380,6 +2662,28 @@ def main():
                         position_size=position_size,
                         theme=st.session_state.theme,
                     )
+
+                if enable_cost_scan and (
+                    cost_commission_grid or cost_slippage_grid
+                ):
+
+                    def _cost_scan_strategy_factory():
+                        return strategy_class(**strategy_params)
+
+                    st.markdown("---")
+                    display_cost_sensitivity_section(
+                        data=data,
+                        strategy_factory=_cost_scan_strategy_factory,
+                        sweep_mode=cost_sweep_mode,
+                        commission_grid=cost_commission_grid,
+                        slippage_grid=cost_slippage_grid,
+                        fixed_commission=commission,
+                        fixed_slippage=slippage,
+                        chart_metric=cost_chart_metric,
+                        initial_capital=initial_capital,
+                        position_size=position_size,
+                        theme=st.session_state.theme,
+                    )
             
             except Exception as e:
                 st.error(f"❌ 錯誤 / Error: {str(e)}")
@@ -2410,6 +2714,7 @@ def main():
         - 🔄 支援 Yahoo Finance 線上數據或上傳自己的 CSV
         - 📥 下載交易明細
         - 🔬 可選參數掃描／網格優化（見 [docs/PARAMETER-SCAN.md](docs/PARAMETER-SCAN.md)）
+        - 💸 可選成本敏感度掃描（見 [docs/COST-SENSITIVITY.md](docs/COST-SENSITIVITY.md)）
         """)
 
 

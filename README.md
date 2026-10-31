@@ -24,6 +24,7 @@
 - ✅ **Phase 4**: 財報／商蹤時間線 / Earnings timeline ([docs](docs/PHASE4-earnings-timeline.md))
 - ✅ **Phase 5**: 事件驅動策略規則 / Event-driven strategy rules ([docs](docs/PHASE5-event-driven-rules.md))
 - ✅ **Parameter scan**: 可選參數網格優化（Streamlit；預設關閉，上限 100 組）/ Opt-in grid search ([docs](docs/PARAMETER-SCAN.md))
+- ✅ **Phase 6c — Cost sensitivity**: 可選佣金／滑點敏感度掃描（Streamlit；預設關閉，上限 100 組）/ Opt-in friction sensitivity ([docs](docs/COST-SENSITIVITY.md))
 
 ### 已完成階段
 
