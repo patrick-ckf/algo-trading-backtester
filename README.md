@@ -28,6 +28,7 @@
 - ✅ **Phase 6b — Walk-forward OOS**: 可選步進樣本外驗證（Streamlit；預設關閉）/ Opt-in walk-forward validation ([docs](docs/WALK-FORWARD.md))
 - ✅ **Phase 6c — Cost sensitivity**: 可選佣金／滑點敏感度掃描（Streamlit；預設關閉，上限 100 組）/ Opt-in friction sensitivity ([docs](docs/COST-SENSITIVITY.md))
 - ✅ **Phase 6d**: 投資組合進階控制（自訂權重 + 再平衡頻率）/ Advanced portfolio controls ([docs](docs/PORTFOLIO-BACKTEST.md#phase-6d-advanced-portfolio-controls))
+- ✅ **Phase 6e**: Monte Carlo／Bootstrap 不確定性區間（Streamlit；預設關閉）/ Opt-in bootstrap uncertainty ([docs](docs/PHASE6E-MONTE-CARLO.md))
 
 ### 已完成階段
 
@@ -55,6 +56,11 @@
   - 在已知事件前後阻止買入訊號（可配置黑名單窗口）
   - 經濟事件 + 財報事件黑名單
   - Phase 0 合規：預設關閉，L0 控制回測始終顯示，對照測試
+- **Phase 6e**：Monte Carlo／Bootstrap 不確定性 ✅ → [docs/PHASE6E-MONTE-CARLO.md](docs/PHASE6E-MONTE-CARLO.md)
+  - Opt-in 事後重抽樣（L1 研究層）
+  - 日權益報酬或交易報酬 Bootstrap，可選區塊重抽樣
+  - 百分位表、直方圖、權益區間圖（Plotly 主題適配）
+  - 描述性不確定性說明，非統計檢定或顯著性聲明
 
 ## 內建策略
 

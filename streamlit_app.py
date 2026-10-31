@@ -106,6 +106,17 @@ from backtester.walk_forward import (
     run_walk_forward,
 )
 
+from backtester.monte_carlo import (
+    MAX_SIMULATIONS,
+    DEFAULT_SIMULATIONS,
+    run_bootstrap,
+    plot_bootstrap_fan,
+    plot_bootstrap_histogram,
+    metric_label as mc_metric_label,
+    source_label as mc_source_label,
+)
+
+
 
 st.set_page_config(
     page_title="演算法交易回測系統",
@@ -745,6 +756,131 @@ def display_walk_forward_section(
         "OOS folds assess stability across windows; optimize mode still risks overfitting. "
         "Main backtest above is unchanged."
     )
+
+def display_monte_carlo_section(
+    *,
+    equity_curve: pd.DataFrame,
+    trades: list,
+    initial_capital: float,
+    n_simulations: int,
+    seed: int,
+    confidence_level: float,
+    source: str,
+    block_size: int,
+    theme: str,
+) -> None:
+    """Bootstrap resampling on completed backtest returns (opt-in research layer)."""
+    st.markdown("## 🎲 Phase 6e：Monte Carlo / Bootstrap 不確定性 / Uncertainty Bands")
+    st.caption(
+        "事後重抽樣（不改 L0 回測）/ Post-hoc resampling (does not change L0 backtest)"
+    )
+
+    progress = st.progress(0.0, text="準備 Bootstrap / Preparing bootstrap...")
+
+    def _on_progress(done: int, total: int) -> None:
+        progress.progress(done / total, text=f"模擬 {done}/{total} / Simulation {done}/{total}")
+
+    try:
+        with st.spinner(
+            f"正在執行 {n_simulations} 次 Bootstrap… / Running {n_simulations} bootstrap draws…"
+        ):
+            result = run_bootstrap(
+                equity_curve=equity_curve,
+                trades=trades,
+                initial_capital=initial_capital,
+                n_simulations=n_simulations,
+                seed=seed,
+                confidence_level=confidence_level,
+                source=source,
+                block_size=block_size,
+                progress_callback=_on_progress,
+            )
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+    finally:
+        progress.empty()
+
+    lo_pct = result.percentile_table["lower_pct"].iloc[0]
+    hi_pct = result.percentile_table["upper_pct"].iloc[0]
+
+    st.warning(
+        "⚠️ **描述性不確定性工具 / Descriptive uncertainty tooling**\n\n"
+        "Bootstrap 區間僅說明「若從這次回測的報酬樣本重抽樣，指標可能如何波動」。"
+        "**不是**統計顯著性檢定、**不是**策略有效性的證明，**不能**替代樣本外驗證。\n\n"
+        "Intervals show how metrics might vary when resampling returns from **this** backtest path. "
+        "They are **not** significance tests, **not** proof of edge, and **not** a substitute for out-of-sample validation."
+    )
+
+    st.markdown(
+        f"**來源 / Source:** {mc_source_label(result.source)} · "
+        f"**模擬 / Sims:** {result.n_simulations} · "
+        f"**種子 / Seed:** {result.seed} · "
+        f"**區間 / Interval:** {lo_pct:.0f}–{hi_pct:.0f}%"
+    )
+    if result.block_size:
+        st.caption(f"區塊 Bootstrap / Block bootstrap: block size = {result.block_size}")
+
+    display_pt = result.percentile_table[
+        ["metric_label", "actual", "p_lower", "p_median", "p_upper"]
+    ].rename(
+        columns={
+            "metric_label": "指標 / Metric",
+            "actual": "實際 / Actual",
+            "p_lower": f"P{lo_pct:.0f}",
+            "p_median": "P50",
+            "p_upper": f"P{hi_pct:.0f}",
+        }
+    )
+    st.dataframe(
+        display_pt.style.format(
+            {
+                "實際 / Actual": "{:.3f}",
+                f"P{lo_pct:.0f}": "{:.3f}",
+                "P50": "{:.3f}",
+                f"P{hi_pct:.0f}": "{:.3f}",
+            },
+            na_rep="N/A",
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    hist_metric = st.selectbox(
+        "直方圖指標 / Histogram metric",
+        options=[METRIC_TOTAL_RETURN, METRIC_MAX_DRAWDOWN, METRIC_SHARPE],
+        format_func=mc_metric_label,
+        key="mc_hist_metric",
+    )
+    st.plotly_chart(
+        plot_bootstrap_histogram(
+            result.metric_samples,
+            hist_metric,
+            result.actual_metrics[hist_metric],
+            theme=theme,
+        ),
+        use_container_width=True,
+    )
+
+    if result.equity_fan is not None and not result.equity_fan.empty:
+        actual_series = equity_curve["Equity"] if "Equity" in equity_curve.columns else None
+        st.plotly_chart(
+            plot_bootstrap_fan(
+                result.equity_fan,
+                actual_series,
+                result.source,
+                confidence_level,
+                theme=theme,
+            ),
+            use_container_width=True,
+        )
+
+    st.info(
+        "💡 調整種子可重現相同結果；增加模擬次數可平滑分佈（上限 "
+        f"{MAX_SIMULATIONS}）。/ Change seed for reproducibility; more simulations smooth "
+        "the distribution (capped)."
+    )
+
 
 def render_backtest_export_section(
     *,
@@ -2333,6 +2469,65 @@ def main():
             cost_commission_grid = []
             cost_slippage_grid = []
         
+        enable_monte_carlo = False
+        mc_n_simulations = DEFAULT_SIMULATIONS
+        mc_seed = 42
+        mc_confidence_pct = 90
+        mc_source = "daily_returns"
+        mc_block_size = 0
+        
+        if backtest_mode == "單一資產 / Single Asset":
+            st.markdown("---")
+            st.subheader("🎲 Phase 6e：Monte Carlo / Bootstrap")
+            st.caption(
+                "L1 研究層：事後不確定性區間（預設關閉）/ L1 research: post-hoc uncertainty (off by default)"
+            )
+            enable_monte_carlo = st.checkbox(
+                "啟用 Bootstrap 不確定性 / Enable Bootstrap Uncertainty",
+                value=False,
+                help=(
+                    "在主要回測完成後重抽樣報酬序列 / "
+                    "After main backtest, resample return sequences"
+                ),
+            )
+            if enable_monte_carlo:
+                mc_n_simulations = st.number_input(
+                    "模擬次數 / Simulations",
+                    min_value=50,
+                    max_value=MAX_SIMULATIONS,
+                    value=DEFAULT_SIMULATIONS,
+                    step=50,
+                    help=f"上限 {MAX_SIMULATIONS} / Capped at {MAX_SIMULATIONS}",
+                )
+                mc_seed = st.number_input(
+                    "隨機種子 / Random seed",
+                    min_value=0,
+                    max_value=2_147_483_647,
+                    value=42,
+                    step=1,
+                )
+                mc_confidence_pct = st.slider(
+                    "置信水準 / Confidence level (%)",
+                    min_value=80,
+                    max_value=99,
+                    value=90,
+                    help="雙尾區間，例如 90% → 5th–95th 百分位 / Two-sided interval",
+                )
+                mc_source = st.selectbox(
+                    "重抽樣來源 / Resample from",
+                    options=["daily_returns", "trade_returns"],
+                    format_func=mc_source_label,
+                    index=0,
+                )
+                mc_block_size = st.number_input(
+                    "區塊大小（0=一般 Bootstrap）/ Block size (0 = i.i.d.)",
+                    min_value=0,
+                    max_value=60,
+                    value=0,
+                    step=1,
+                    help="僅對日報酬或交易報酬序列生效 / Applies to daily or trade return pool",
+                )
+        
         # Research panels only for single asset mode
         show_calendar = False
         calendar_event_types = []
@@ -3344,6 +3539,21 @@ def main():
                         position_size=position_size,
                         theme=st.session_state.theme,
                     )
+
+                if enable_monte_carlo:
+                    st.markdown("---")
+                    display_monte_carlo_section(
+                        equity_curve=equity_curve,
+                        trades=engine.trades,
+                        initial_capital=initial_capital,
+                        n_simulations=int(mc_n_simulations),
+                        seed=int(mc_seed),
+                        confidence_level=float(mc_confidence_pct) / 100.0,
+                        source=mc_source,
+                        block_size=int(mc_block_size),
+                        theme=st.session_state.theme,
+                    )
+
             
             except Exception as e:
                 st.error(f"❌ 錯誤 / Error: {str(e)}")
